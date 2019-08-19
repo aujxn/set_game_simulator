@@ -112,7 +112,7 @@ impl Hand {
                 }
             }
             /* If cards were added the logic changes slightly. See note at line
-             * 50ish about possible refactor.
+             * 61 about possible refactor.
              */
         } else {
             loop {
@@ -280,12 +280,12 @@ fn main() {
 
                             /* Exits the while game loop. Eventually change game to a function and
                              * have this return some game data. This loop will be the part that runs
-                             * in parrellel.
+                             * in parallel.
                              */
                             continue;
                         }
                     }
-                /* For some reason this works and the below version on 286 doesn't. */
+                /* For some reason this works and the below version on 292 doesn't. */
                 hand.count += 1;
                 }
                 /* Added three cards to the hand */
