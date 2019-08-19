@@ -183,7 +183,7 @@ fn main() {
     /* Each iteration of this loop plays a game. This is where my thread fork should go.
      * Currently a million games takes about 15 seconds (one thread) compiled for release.
      */
-    for _x in 0..1_000_000 {
+    for _x in 0..10000 {
 
         /* This is the data structure for the full deck */
         let mut deck: Vec<Card> = vec![];
