@@ -1,3 +1,9 @@
+/* Author: Austen Nelson
+ * A Set game simulator
+ *
+ * 8/19/2019
+ */
+
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
