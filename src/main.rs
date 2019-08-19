@@ -226,11 +226,12 @@ fn main() {
     }
     println!("setless 12's {:?}", setless12);
     println!("set 12's {:?}", set12);
-    println!("proportion of 12's {:?}", setless12 as f64 / set12 as f64);
+    println!("proportion of 12's {:?}\n", setless12 as f64 / set12 as f64);
+
 
     println!("setless 15's {:?}", setless15);
     println!("set 15's {:?}", set15);
-    println!("proportion of 15's {:?}", setless15 as f64 / set15 as f64);
+    println!("proportion of 15's {:?}\n", setless15 as f64 / set15 as f64);
 
     println!("setless 18's {:?}", setless18);
     println!("set 18's {:?}", set18);
