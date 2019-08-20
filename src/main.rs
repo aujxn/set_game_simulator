@@ -20,7 +20,7 @@ struct Card(usize, usize, usize, usize);
  * Returned by the Hand method find_set()
  */
 enum Set {
-    Found(usize, usize, usize, usize),  // was there a set in the hand?
+    Found(usize, usize, usize, usize), // was there a set in the hand?
     NotFound(usize),
 }
 
@@ -33,8 +33,8 @@ fn find_set_all(hand: &Vec<Card>) -> Set {
     for trio in indices {
         if is_set(&hand[trio[0]], &hand[trio[1]], &hand[trio[2]]) {
             return Set::Found(trio[0], trio[1], trio[2], hand.len());
-            }
         }
+    }
     Set::NotFound(hand.len())
 }
 
@@ -128,22 +128,18 @@ fn main() {
          */
         while game {
             match set {
-                Set::Found(x, y, z, l) => {
-                match l {
+                Set::Found(x, y, z, l) => match l {
                     12 => set12 += 1,
                     15 => set15 += 1,
                     18 => set18 += 1,
                     _ => unreachable!(),
-                }
                 },
-                Set::NotFound(l) => {
-                match l {
+                Set::NotFound(l) => match l {
                     12 => setless12 += 1,
                     15 => setless15 += 1,
                     18 => setless18 += 1,
                     _ => unreachable!(),
-                }
-            },
+                },
             }
 
             /* Add cards to the hand before removing the match
@@ -157,7 +153,7 @@ fn main() {
              * than 13 here because the set hasn't been removed
              * yet.
              */
-            if let Set::NotFound(l) = set || hand.len() < 13 { 
+            if let Set::NotFound(l) = set || hand.len() < 13 {
                 for _i in 0..3 {
                     match deck.pop() {
                         Some(x) => hand.push(x),
@@ -185,19 +181,19 @@ fn main() {
              */
             match set {
                 Set::Found(x, y, z, l) => {
-                hand.swap_remove(x);
-                hand.swap_remove(y);
-                hand.swap_remove(z);
+                    hand.swap_remove(x);
+                    hand.swap_remove(y);
+                    hand.swap_remove(z);
 
-                /* The bool arg to find_set indicates if cards were added and the
-                 * previous hand had no sets. This means the find_set function only
-                 * has to check the added cards for sets, preventing duplicate work
-                 */
-                set = find_set_all(&hand);
-                },
+                    /* The bool arg to find_set indicates if cards were added and the
+                     * previous hand had no sets. This means the find_set function only
+                     * has to check the added cards for sets, preventing duplicate work
+                     */
+                    set = find_set_all(&hand);
+                }
                 Set::NotFound(l) => {
                     set = find_set_part(&hand);
-                },
+                }
             }
         }
     }
