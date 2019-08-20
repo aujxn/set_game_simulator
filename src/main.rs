@@ -82,9 +82,7 @@ fn main() {
     let mut setless18 = 0;
     let mut set18 = 0;
 
-    /* Each iteration of this loop plays a game. This is where my thread fork should go.
-     * Currently a million games takes about 15 seconds (one thread) compiled for release.
-     */
+    /* Each iteration of this loop plays a game. */
     for _x in 0..1_000_000 {
         /* This is the data structure for the full deck */
         let mut deck: Vec<Card> = vec![];
@@ -100,15 +98,11 @@ fn main() {
             }
         }
 
-        /* Randomize the cards, actually should probably thread fork after shuffle */
+        /* Randomize the cards */
         deck.shuffle(&mut thread_rng());
 
-        /* Some variables for creating the hand struct */
         let mut hand = vec![]; //cards in the hand
 
-        /* Should be able to remove this variable when I refactor this loop
-         * to be its own function. Right now its used to break to game loop.
-         */
         let mut game = true; //indicates the game isn't complete
 
         /* Get the first 12 cards for the hand from the deck */
@@ -122,76 +116,60 @@ fn main() {
         /* Find the first set, primes the game loop for how it is currently structured. */
         let mut set = find_set_all(&hand);
 
-        /* This is the loop that plays one entire game of set. Currently it uses mutable variables
-         * created in main but I would like this loop to be run on multiple threads so I plan on
-         * figuring out how to use locking data structures to store game information.
-         */
+        /* This is the loop that plays one entire game of set. */
         while game {
             match set {
-                Set::Found(x, y, z, l) => match l {
-                    12 => set12 += 1,
-                    15 => set15 += 1,
-                    18 => set18 += 1,
-                    _ => unreachable!(),
-                },
-                Set::NotFound(l) => match l {
-                    12 => setless12 += 1,
-                    15 => setless15 += 1,
-                    18 => setless18 += 1,
-                    _ => unreachable!(),
-                },
-            }
+                Set::Found(x, y, z, l) => {
+                    /* Add to the count that a set was found */
+                    match l {
+                        12 => set12 += 1,
+                        15 => set15 += 1,
+                        18 => set18 += 1,
+                        _ => unreachable!(),
+                    }
 
-            /* Add cards to the hand before removing the match
-             * because swap_remove() replaces the card with
-             * the cards at the end. This ensures that removing
-             * a card doesn't change the position of the other
-             * cards currently in the hand.
-             */
-            /* In Set you deal more cards if there is 9 cards
-             * or if a set wasn't found in the hand. It is less
-             * than 13 here because the set hasn't been removed
-             * yet.
-             */
-            if let Set::NotFound(l) = set || hand.len() < 13 {
-                for _i in 0..3 {
-                    match deck.pop() {
-                        Some(x) => hand.push(x),
-                        None => {
-                            /* Currently the game ends immediatelly when the cards run out. I might
-                             * change this to find all the remaining sets in the hand before
-                             * terminating. This way I could even collect some data about the sub
-                             * 12 card hands that result at the end of a game.
-                             */
-                            game = false;
-
-                            /* Exits the while game loop. Eventually change game to a function and
-                             * have this return some game data. This loop will be the part that runs
-                             * in parallel.
-                             */
-                            continue;
+                    /* If the deck has 12 cards add 3 cards to the hand */
+                    if l == 12 {
+                        for _i in 0..3 {
+                            match deck.pop() {
+                                Some(x) => hand.push(x),
+                                None => {
+                                    game = false;
+                                    continue;
+                                }
+                            }
                         }
                     }
-                }
-            }
 
-            /* Cards have likely been added to the hand but the set hasn't been removed.
-             * This kind of feels like it should be a job for find_set function.
-             * Consider restructuring here.
-             */
-            match set {
-                Set::Found(x, y, z, l) => {
+                    /* remove the cards from the hand that made a set */
                     hand.swap_remove(x);
                     hand.swap_remove(y);
                     hand.swap_remove(z);
 
-                    /* The bool arg to find_set indicates if cards were added and the
-                     * previous hand had no sets. This means the find_set function only
-                     * has to check the added cards for sets, preventing duplicate work
-                     */
+                    /* search for the next set in all the cards */
                     set = find_set_all(&hand);
                 }
                 Set::NotFound(l) => {
+                    /* update the count of hand with no sets */
+                    match l {
+                        12 => setless12 += 1,
+                        15 => setless15 += 1,
+                        18 => setless18 += 1,
+                        _ => unreachable!(),
+                    }
+
+                    /* add three more cards to the hand */
+                    for _i in 0..3 {
+                        match deck.pop() {
+                            Some(x) => hand.push(x),
+                            None => {
+                                game = false;
+                                continue;
+                            }
+                        }
+                    }
+
+                    /* find the next set, but only look at combinations that use new cards */
                     set = find_set_part(&hand);
                 }
             }
