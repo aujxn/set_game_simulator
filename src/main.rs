@@ -183,7 +183,7 @@ fn main() {
     let mut results = GameResult(0, 0, 0, 0, 0, 0, 0);
 
     /* Each iteration of this loop plays a game. */
-    for _x in 0..100_000 {
+    for _x in 0..10_000 {
         results += play_game();
     }
 
