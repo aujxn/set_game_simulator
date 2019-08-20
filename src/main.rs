@@ -4,6 +4,7 @@
  * 8/19/2019
  */
 
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -31,112 +32,38 @@ struct Set {
 /* Searches for a set in the hand and returns an object with details
  * about what was found (or not found).
  */
-fn find_set(hand: &Vec<Card>, added: bool) -> Set {
-    /* i, j, and k are indices of the Hand's cards vector. I start looking
-     * at the end of the vector because when cards are added in the case
-     * where no sets were found then it is only necesarry to check the possible
-     * sets with those cards.
-     */
-    let mut i = hand.len() - 1;
-    let mut j = i - 1;
-    let mut k = j - 1;
+fn find_set_all(hand: &Vec<Card>) -> Set {
+    let indices = (0..hand.len()).combinations(3);
 
-    /* If cards were added because no set was found then it changes the search
-     * logic slightly. There is a lot of duplicate code in these two loops. I
-     * think it should probably be two different functions. Maybe I could use
-     * closures to make it a single function without duplicate code.
-     */
-    /* This search would be much cleaner recursively but I'm pretty sure performance
-     * would take a significant hit because it wouldn't be tail recursion. Maybe I
-     * should write it and see how much slower it is.
-     */
-    if !added {
-        loop {
-            /* Check if the current indices make a set */
-            if is_set(&hand[i], &hand[j], &hand[k]) {
-                /* If they do return that set's details */
-                return Set {
-                    found: true,
-                    count: hand.len(),
-                    card1: i,
-                    card2: j,
-                    card3: k,
-                };
-            /* Set wasn't found yet */
-            } else {
-                /* This means there is only one more group of cards left to check */
-                if i == 2 {
-                    if is_set(&hand[2], &hand[1], &hand[0]) {
-                        return Set {
-                            found: true,
-                            count: hand.len(),
-                            card1: 2,
-                            card2: 1,
-                            card3: 0,
-                        };
-                    } else {
-                        return Set {
-                            found: false,
-                            count: hand.len(),
-                            card1: 0,
-                            card2: 0,
-                            card3: 0,
-                        };
-                    }
-                /* Walk down the indices until i gets to 2. The logic here
-                 * is a little weird and could be much better. Recursive would
-                 * be best. Using nested for loops would even be beter but meh.
-                 */
-                } else if j == 1 {
-                    i -= 1;
-                    j = i - 1;
-                    k = j - 1;
-                } else if k == 0 {
-                    j -= 1;
-                    k = j - 1;
-                } else {
-                    k -= 1;
-                }
-            }
+    for trio in indices {
+        println!("indices: {:?}, {:?}, {:?}", trio[0], trio[1], trio[2]);
+        if is_set(&hand[trio[0]], &hand[trio[1]], &hand[trio[2]]) {
+            return Set {
+                found: true,
+                count: hand.len(),
+                card1: trio[0],
+                card2: trio[1],
+                card3: trio[2],
+            };
         }
-    /* If cards were added the logic changes slightly. See note at line
-     * 61 about possible refactor.
-     */
-    } else {
-        loop {
-            if is_set(&hand[i], &hand[j], &hand[k]) {
-                return Set {
-                    found: true,
-                    count: hand.len(),
-                    card1: i,
-                    card2: j,
-                    card3: k,
-                };
-            } else {
-                /* instead of i == 2 when i gets to a card that isn't one of the
-                 * added cards then there is no set in the extended deck.
-                 */
-                if i == hand.len() - 4 {
-                    return Set {
-                        found: false,
-                        count: hand.len(),
-                        card1: 0,
-                        card2: 0,
-                        card3: 0,
-                    };
-                /* Same nasty countdown */
-                } else if j == 1 {
-                    i -= 1;
-                    j = i - 1;
-                    k = j - 1;
-                } else if k == 0 {
-                    j -= 1;
-                    k = j - 1;
-                } else {
-                    k -= 1;
-                }
-            }
-        }
+    }
+
+    Set {
+        found: false,
+        count: hand.len(),
+        card1: 0,
+        card2: 0,
+        card3: 0,
+    }
+}
+
+fn find_set_part(hand: &Vec<Card>) -> Set {
+    Set {
+        found: true,
+        count: hand.len(),
+        card1: 0,
+        card2: 0,
+        card3: 0,
     }
 }
 
@@ -175,7 +102,7 @@ fn main() {
     /* Each iteration of this loop plays a game. This is where my thread fork should go.
      * Currently a million games takes about 15 seconds (one thread) compiled for release.
      */
-    for _x in 0..10000 {
+    for _x in 0..1_000_000 {
         /* This is the data structure for the full deck */
         let mut deck: Vec<Card> = vec![];
 
@@ -210,7 +137,7 @@ fn main() {
         }
 
         /* Find the first set, primes the game loop for how it is currently structured. */
-        let mut set = find_set(&hand, false);
+        let mut set = find_set_all(&hand);
 
         /* This is the loop that plays one entire game of set. Currently it uses mutable variables
          * created in main but I would like this loop to be run on multiple threads so I plan on
@@ -279,9 +206,10 @@ fn main() {
                  * previous hand had no sets. This means the find_set function only
                  * has to check the added cards for sets, preventing duplicate work
                  */
-                set = find_set(&hand, false);
+                set = find_set_all(&hand);
             } else {
-                set = find_set(&hand, true);
+                //change to part
+                set = find_set_all(&hand);
             }
         }
     }
