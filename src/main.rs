@@ -19,14 +19,9 @@ struct Card(usize, usize, usize, usize);
 /* Used to report the findings of playing a single hand.
  * Returned by the Hand method find_set()
  */
-struct Set {
-    found: bool,  // was there a set in the hand?
-    count: usize, // how many cards were in the hand
-
-    /* The indices of the Cards in the hand that make a set (if found) */
-    card1: usize,
-    card2: usize,
-    card3: usize,
+enum Set {
+    Found(usize, usize, usize, usize),  // was there a set in the hand?
+    NotFound(usize),
 }
 
 /* Searches for a set in the hand and returns an object with details
@@ -36,25 +31,11 @@ fn find_set_all(hand: &Vec<Card>) -> Set {
     let indices = (0..hand.len()).combinations(3);
 
     for trio in indices {
-        println!("indices: {:?}, {:?}, {:?}", trio[0], trio[1], trio[2]);
         if is_set(&hand[trio[0]], &hand[trio[1]], &hand[trio[2]]) {
-            return Set {
-                found: true,
-                count: hand.len(),
-                card1: trio[0],
-                card2: trio[1],
-                card3: trio[2],
-            };
+            return Set::Found(trio[0], trio[1], trio[2], hand.len());
+            }
         }
-    }
-
-    Set {
-        found: false,
-        count: hand.len(),
-        card1: 0,
-        card2: 0,
-        card3: 0,
-    }
+    Set::NotFound(hand.len())
 }
 
 fn find_set_part(hand: &Vec<Card>) -> Set {
@@ -62,24 +43,11 @@ fn find_set_part(hand: &Vec<Card>) -> Set {
         let indices = (0..hand.len() - 3).combinations(2);
         for duo in indices {
             if is_set(&hand[duo[0]], &hand[duo[1]], &hand[i]) {
-                return Set {
-                    found: true,
-                    count: hand.len(),
-                    card1: duo[0],
-                    card2: duo[1],
-                    card3: i,
-                };
+                return Set::Found(duo[0], duo[1], i, hand.len());
             }
         }
     }
-
-    Set {
-        found: false,
-        count: hand.len(),
-        card1: 0,
-        card2: 0,
-        card3: 0,
-    }
+    Set::NotFound(hand.len())
 }
 
 /* Function to check if a trio of cards is a set. In the game of
@@ -159,20 +127,23 @@ fn main() {
          * figuring out how to use locking data structures to store game information.
          */
         while game {
-            if set.found {
-                match set.count {
+            match set {
+                Set::Found(x, y, z, l) => {
+                match l {
                     12 => set12 += 1,
                     15 => set15 += 1,
                     18 => set18 += 1,
-                    _ => (),
+                    _ => unreachable!(),
                 }
-            } else {
-                match set.count {
+                },
+                Set::NotFound(l) => {
+                match l {
                     12 => setless12 += 1,
                     15 => setless15 += 1,
                     18 => setless18 += 1,
-                    _ => (),
+                    _ => unreachable!(),
                 }
+            },
             }
 
             /* Add cards to the hand before removing the match
@@ -186,7 +157,7 @@ fn main() {
              * than 13 here because the set hasn't been removed
              * yet.
              */
-            if hand.len() < 13 || !set.found {
+            if let Set::NotFound(l) = set || hand.len() < 13 { 
                 for _i in 0..3 {
                     match deck.pop() {
                         Some(x) => hand.push(x),
@@ -212,18 +183,21 @@ fn main() {
              * This kind of feels like it should be a job for find_set function.
              * Consider restructuring here.
              */
-            if set.found {
-                hand.swap_remove(set.card1);
-                hand.swap_remove(set.card2);
-                hand.swap_remove(set.card3);
+            match set {
+                Set::Found(x, y, z, l) => {
+                hand.swap_remove(x);
+                hand.swap_remove(y);
+                hand.swap_remove(z);
 
                 /* The bool arg to find_set indicates if cards were added and the
                  * previous hand had no sets. This means the find_set function only
                  * has to check the added cards for sets, preventing duplicate work
                  */
                 set = find_set_all(&hand);
-            } else {
-                set = find_set_part(&hand);
+                },
+                Set::NotFound(l) => {
+                    set = find_set_part(&hand);
+                },
             }
         }
     }
