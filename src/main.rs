@@ -8,7 +8,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 #[derive(Debug)]
-/* Names tuple for a single card. I feel like this should use 
+/* Names tuple for a single card. I feel like this should use
  * an enum since the card values can only be 0, 1, or 2 but
  * I was getting compiler errors because I don't know how to rust.
  */
@@ -19,8 +19,8 @@ struct Card(usize, usize, usize, usize);
  * Returned by the Hand method find_set()
  */
 struct Set {
-    found: bool,        // was there a set in the hand?
-    count: usize,       // how many cards were in the hand
+    found: bool,  // was there a set in the hand?
+    count: usize, // how many cards were in the hand
 
     /* The indices of the Cards in the hand that make a set (if found) */
     card1: usize,
@@ -28,125 +28,112 @@ struct Set {
     card3: usize,
 }
 
-#[derive(Debug)]
-/* Represents the state of the cards that are currently in play.
- * The game begins with a 12 card hand. With 12 cards in play,
- * if a set is found it is removed and replaced with 3 new cards.
- * If no set is found 3 cards are added to the hand.
+/* Searches for a set in the hand and returns an object with details
+ * about what was found (or not found).
  */
-struct Hand {
-    cards: Vec<Card>,       //cards in play
-    count: usize,           //how many cards
- }
-
-impl Hand {
-    /* Searches for a set in the hand and returns an object with details
-     * about what was found (or not found).
+fn find_set(hand: &Vec<Card>, added: bool) -> Set {
+    /* i, j, and k are indices of the Hand's cards vector. I start looking
+     * at the end of the vector because when cards are added in the case
+     * where no sets were found then it is only necesarry to check the possible
+     * sets with those cards.
      */
-    fn find_set(&self, added: bool) -> Set {
-        /* i, j, and k are indices of the Hand's cards vector. I start looking
-         * at the end of the vector because when cards are added in the case
-         * where no sets were found then it is only necesarry to check the possible
-         * sets with those cards.
-         */
-        let mut i = self.count - 1;
-        let mut j = i - 1;
-        let mut k = j - 1;
+    let mut i = hand.len() - 1;
+    let mut j = i - 1;
+    let mut k = j - 1;
 
-        /* If cards were added because no set was found then it changes the search
-         * logic slightly. There is a lot of duplicate code in these two loops. I
-         * think it should probably be two different functions. Maybe I could use
-         * closures to make it a single function without duplicate code.
-         */
-        /* This search would be much cleaner recursively but I'm pretty sure performance
-         * would take a significant hit because it wouldn't be tail recursion. Maybe I
-         * should write it and see how much slower it is.
-         */
-        if !added {
-            loop {
-                /* Check if the current indices make a set */
-                if is_set(&self.cards[i], &self.cards[j], &self.cards[k]) {
-                    /* If they do return that set's details */
-                    return Set {
-                        found: true,
-                        count: self.count,
-                        card1: i,
-                        card2: j,
-                        card3: k,
-                    }
-                    /* Set wasn't found yet */
-                } else {
-                    /* This means there is only one more group of cards left to check */
-                    if i == 2 {
-                        if is_set(&self.cards[2], &self.cards[1], &self.cards[0]) {
-                            return Set {
-                                found: true,
-                                count: self.count,
-                                card1: 2,
-                                card2: 1,
-                                card3: 0,
-                            }
-                        } else {
-                            return Set {
-                                found: false,
-                                count: self.count,
-                                card1: 0,
-                                card2: 0,
-                                card3: 0,
-                            }
-                        }
-                        /* Walk down the indices until i gets to 2. The logic here
-                         * is a little weird and could be much better. Recursive would
-                         * be best. Using nested for loops would even be beter but meh.
-                         */
-                    } else if j == 1 {
-                        i -= 1;
-                        j = i - 1;
-                        k = j - 1;
-                    } else if k == 0 {
-                        j -= 1;
-                        k = j - 1;
+    /* If cards were added because no set was found then it changes the search
+     * logic slightly. There is a lot of duplicate code in these two loops. I
+     * think it should probably be two different functions. Maybe I could use
+     * closures to make it a single function without duplicate code.
+     */
+    /* This search would be much cleaner recursively but I'm pretty sure performance
+     * would take a significant hit because it wouldn't be tail recursion. Maybe I
+     * should write it and see how much slower it is.
+     */
+    if !added {
+        loop {
+            /* Check if the current indices make a set */
+            if is_set(&hand[i], &hand[j], &hand[k]) {
+                /* If they do return that set's details */
+                return Set {
+                    found: true,
+                    count: hand.len(),
+                    card1: i,
+                    card2: j,
+                    card3: k,
+                };
+            /* Set wasn't found yet */
+            } else {
+                /* This means there is only one more group of cards left to check */
+                if i == 2 {
+                    if is_set(&hand[2], &hand[1], &hand[0]) {
+                        return Set {
+                            found: true,
+                            count: hand.len(),
+                            card1: 2,
+                            card2: 1,
+                            card3: 0,
+                        };
                     } else {
-                        k -= 1;
-                    }
-                }
-            }
-            /* If cards were added the logic changes slightly. See note at line
-             * 61 about possible refactor.
-             */
-        } else {
-            loop {
-                if is_set(&self.cards[i], &self.cards[j], &self.cards[k]) {
-                    return Set {
-                        found: true,
-                        count: self.count,
-                        card1: i,
-                        card2: j,
-                        card3: k,
-                    };
-                } else {
-                    /* instead of i == 2 when i gets to a card that isn't one of the
-                     * added cards then there is no set in the extended deck.
-                     */
-                    if i == self.count - 4 {
                         return Set {
                             found: false,
-                            count: self.count,
+                            count: hand.len(),
                             card1: 0,
                             card2: 0,
                             card3: 0,
                         };
-                        /* Same nasty countdown */
-                    } else if j == 1 {
-                        i -= 1;
-                        j = i - 1;
-                        k = j - 1;
-                    } else if k == 0 {
-                        j -= 1;
-                        k = j - 1;
-                    } else {
-                        k -= 1;
                     }
+                /* Walk down the indices until i gets to 2. The logic here
+                 * is a little weird and could be much better. Recursive would
+                 * be best. Using nested for loops would even be beter but meh.
+                 */
+                } else if j == 1 {
+                    i -= 1;
+                    j = i - 1;
+                    k = j - 1;
+                } else if k == 0 {
+                    j -= 1;
+                    k = j - 1;
+                } else {
+                    k -= 1;
+                }
+            }
+        }
+    /* If cards were added the logic changes slightly. See note at line
+     * 61 about possible refactor.
+     */
+    } else {
+        loop {
+            if is_set(&hand[i], &hand[j], &hand[k]) {
+                return Set {
+                    found: true,
+                    count: hand.len(),
+                    card1: i,
+                    card2: j,
+                    card3: k,
+                };
+            } else {
+                /* instead of i == 2 when i gets to a card that isn't one of the
+                 * added cards then there is no set in the extended deck.
+                 */
+                if i == hand.len() - 4 {
+                    return Set {
+                        found: false,
+                        count: hand.len(),
+                        card1: 0,
+                        card2: 0,
+                        card3: 0,
+                    };
+                /* Same nasty countdown */
+                } else if j == 1 {
+                    i -= 1;
+                    j = i - 1;
+                    k = j - 1;
+                } else if k == 0 {
+                    j -= 1;
+                    k = j - 1;
+                } else {
+                    k -= 1;
                 }
             }
         }
@@ -174,7 +161,6 @@ fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
 }
 
 fn main() {
-
     /* These store information about how many of each hand type were encountered by the simulation.
      * Setless# means there was no sets in the hand and set# means a set was found. The number is
      * how many cards were in the hand.
@@ -190,7 +176,6 @@ fn main() {
      * Currently a million games takes about 15 seconds (one thread) compiled for release.
      */
     for _x in 0..10000 {
-
         /* This is the data structure for the full deck */
         let mut deck: Vec<Card> = vec![];
 
@@ -209,30 +194,23 @@ fn main() {
         deck.shuffle(&mut thread_rng());
 
         /* Some variables for creating the hand struct */
-        let cards = vec![];     //cards in the hand
-        let count = 12;         //number of cards in hand
+        let mut hand = vec![]; //cards in the hand
 
         /* Should be able to remove this variable when I refactor this loop
          * to be its own function. Right now its used to break to game loop.
          */
-        let mut game = true;        //indicates the game isn't complete
-
-        /* Build the hand object */
-        let mut hand = Hand {
-            cards,
-            count,
-        };
+        let mut game = true; //indicates the game isn't complete
 
         /* Get the first 12 cards for the hand from the deck */
         for _i in 0..12 {
             match deck.pop() {
-                Some(x) => hand.cards.push(x),
-                None => unreachable!(),     //there will always be 81 cards in the deck to start
+                Some(x) => hand.push(x),
+                None => unreachable!(), //there will always be 81 cards in the deck to start
             }
         }
 
         /* Find the first set, primes the game loop for how it is currently structured. */
-        let mut set = hand.find_set(false);
+        let mut set = find_set(&hand, false);
 
         /* This is the loop that plays one entire game of set. Currently it uses mutable variables
          * created in main but I would like this loop to be run on multiple threads so I plan on
@@ -266,10 +244,10 @@ fn main() {
              * than 13 here because the set hasn't been removed
              * yet.
              */
-            if hand.count < 13 || !set.found {
+            if hand.len() < 13 || !set.found {
                 for _i in 0..3 {
                     match deck.pop() {
-                        Some(x) => hand.cards.push(x),
+                        Some(x) => hand.push(x),
                         None => {
                             /* Currently the game ends immediatelly when the cards run out. I might
                              * change this to find all the remaining sets in the hand before
@@ -285,11 +263,7 @@ fn main() {
                             continue;
                         }
                     }
-                /* For some reason this works and the below version on 292 doesn't. */
-                hand.count += 1;
                 }
-                /* Added three cards to the hand */
-                //hand.count += 3;
             }
 
             /* Cards have likely been added to the hand but the set hasn't been removed.
@@ -297,18 +271,17 @@ fn main() {
              * Consider restructuring here.
              */
             if set.found {
-                hand.cards.swap_remove(set.card1);
-                hand.cards.swap_remove(set.card2);
-                hand.cards.swap_remove(set.card3);
-                hand.count -= 3;
+                hand.swap_remove(set.card1);
+                hand.swap_remove(set.card2);
+                hand.swap_remove(set.card3);
 
                 /* The bool arg to find_set indicates if cards were added and the
                  * previous hand had no sets. This means the find_set function only
                  * has to check the added cards for sets, preventing duplicate work
                  */
-                set = hand.find_set(false);
+                set = find_set(&hand, false);
             } else {
-                set = hand.find_set(true);
+                set = find_set(&hand, true);
             }
         }
     }
@@ -317,7 +290,6 @@ fn main() {
     println!("setless 12's {:?}", setless12);
     println!("set 12's {:?}", set12);
     println!("proportion of 12's {:?}\n", setless12 as f64 / set12 as f64);
-
 
     println!("setless 15's {:?}", setless15);
     println!("set 15's {:?}", set15);
