@@ -58,8 +58,24 @@ fn find_set_all(hand: &Vec<Card>) -> Set {
 }
 
 fn find_set_part(hand: &Vec<Card>) -> Set {
+
+    for i in hand.len()-3 .. hand.len() {
+        let indices = (0..hand.len()-3).combinations(2);
+        for duo in indices {
+            if is_set(&hand[duo[0]], &hand[duo[1]], &hand[i]) {
+            return Set {
+                found: true,
+                count: hand.len(),
+                card1: duo[0],
+                card2: duo[1],
+                card3: i,
+            };
+                }
+        }
+    }
+
     Set {
-        found: true,
+        found: false,
         count: hand.len(),
         card1: 0,
         card2: 0,
@@ -208,8 +224,7 @@ fn main() {
                  */
                 set = find_set_all(&hand);
             } else {
-                //change to part
-                set = find_set_all(&hand);
+                set = find_set_part(&hand);
             }
         }
     }
