@@ -53,7 +53,7 @@ enum Set {
 }
 
 /* Searches entire hand for sets */
-fn find_set_all(hand: &Vec<Card>) -> Set {
+fn find_set_all(hand: &[Card]) -> Set {
     let indices = (0..hand.len()).tuple_combinations::<(_, _, _)>();
 
     for (x, y, z) in indices {
@@ -67,7 +67,7 @@ fn find_set_all(hand: &Vec<Card>) -> Set {
 /* Searches for sets but only for sets that include at least one of
  * the last three cards in the hand
  */
-fn find_set_part(hand: &Vec<Card>) -> Set {
+fn find_set_part(hand: &[Card]) -> Set {
     for i in hand.len() - 3..hand.len() {
         let indices = (0..hand.len() - 3).tuple_combinations();
         for (x, y) in indices {
@@ -87,16 +87,14 @@ fn find_set_part(hand: &Vec<Card>) -> Set {
  * passes the set requirements.
  */
 fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
-    if (first.0 + second.0 + third.0) % 3 != 0 {
-        return false;
-    } else if (first.1 + second.1 + third.1) % 3 != 0 {
-        return false;
-    } else if (first.2 + second.2 + third.2) % 3 != 0 {
-        return false;
-    } else if (first.3 + second.3 + third.3) % 3 != 0 {
-        return false;
+    if (first.0 + second.0 + third.0) % 3 == 0
+        && (first.1 + second.1 + third.1) % 3 == 0
+        && (first.2 + second.2 + third.2) % 3 == 0
+        && (first.3 + second.3 + third.3) % 3 == 0
+    {
+        return true;
     }
-    true
+    false
 }
 
 /* Plays an entire game of set and returns some information */
@@ -199,8 +197,9 @@ fn play_game() -> GameResult {
 
 fn main() {
     let mut results = GameResult(0, 0, 0, 0, 0, 0, 0);
+    let games = 1_000_000;
 
-    let tasks: Vec<GameResult> = vec![GameResult(0, 0, 0, 0, 0, 0, 0); 1_000_000];
+    let tasks: Vec<GameResult> = vec![GameResult(0, 0, 0, 0, 0, 0, 0); games];
 
     let completed: Vec<_> = tasks.par_iter().map(|_| play_game()).collect();
 
@@ -211,26 +210,32 @@ fn main() {
     }
 
     /* Report the findings about the games */
-    println!("\nsetless 12's {:?}", results.0);
-    println!("set 12's {:?}", results.1);
+    println!("After {:?} games of simulated... \n\n", games);
+
+    println!("12 card hands with no sets: {:?}", results.0);
+    println!("12 card hands where set was found: {:?}", results.1);
     println!(
-        "proportion of 12's {:?}\n",
-        results.0 as f64 / results.1 as f64
+        "proportion of 12s w/out sets: {:.3}%\n",
+        100.0 * results.0 as f64 / results.1 as f64
     );
 
-    println!("setless 15's {:?}", results.2);
-    println!("set 15's {:?}", results.3);
+    println!("15 card hands with no sets: {:?}", results.2);
+    println!("15 card hands where set was found: {:?}", results.3);
     println!(
-        "proportion of 15's {:?}\n",
-        results.2 as f64 / results.3 as f64
+        "proportion of 15s w/out sets: {:.3}%\n",
+        100.0 * results.2 as f64 / results.3 as f64
     );
 
-    println!("setless 18's {:?}", results.4);
-    println!("set 18's {:?}", results.5);
+    println!("18 card hands with no sets: {:?}", results.4);
+    println!("18 card hands where set was found: {:?}", results.5);
     println!(
-        "proportion of 18's {:?}\n",
-        results.4 as f64 / results.5 as f64
+        "proportion of 18s w/out sets: {:.3}%\n",
+        100.0 * results.4 as f64 / results.5 as f64
     );
 
-    println!("set 21's {:?}", results.6);
+    println!(
+        "21 cards hands encountered: {:?}\n ({:?} games per 21 card hand)",
+        results.6,
+        games as i64 / results.6
+    );
 }
