@@ -32,6 +32,7 @@ impl Add for GameResult {
         )
     }
 }
+
 impl AddAssign for GameResult {
     fn add_assign(&mut self, other: Self) {
         self.0 = self.0 + other.0;
@@ -201,7 +202,9 @@ fn main() {
 
     let tasks: Vec<GameResult> = vec![GameResult(0, 0, 0, 0, 0, 0, 0); 1_000_000];
 
-    let completed: Vec<_> = tasks.par_iter().map(|result| play_game()).collect();
+    let completed: Vec<_> = tasks.par_iter().map(|_| play_game()).collect();
+
+    //let results = completed.par_iter().reduce(|| results, |a, b| a + b);
 
     for task in completed {
         results += task;
