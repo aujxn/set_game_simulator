@@ -7,14 +7,31 @@
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::ops::AddAssign;
+use rayon::prelude::*;
+use std::ops::{Add, AddAssign};
 
 /* Each card has 4 characteristics that can have 3 states */
 struct Card(usize, usize, usize, usize);
 
 /* Reports how many of each hand were encountered in the game */
+#[derive(Clone)]
 struct GameResult(i64, i64, i64, i64, i64, i64, i64);
 
+impl Add for GameResult {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(
+            self.0 + other.0,
+            self.1 + other.1,
+            self.2 + other.2,
+            self.3 + other.3,
+            self.4 + other.4,
+            self.5 + other.5,
+            self.6 + other.6,
+        )
+    }
+}
 impl AddAssign for GameResult {
     fn add_assign(&mut self, other: Self) {
         self.0 = self.0 + other.0;
@@ -36,7 +53,7 @@ enum Set {
 
 /* Searches entire hand for sets */
 fn find_set_all(hand: &Vec<Card>) -> Set {
-    let indices = (0..hand.len()).tuple_combinations::<(_,_,_)>();
+    let indices = (0..hand.len()).tuple_combinations::<(_, _, _)>();
 
     for (x, y, z) in indices {
         if is_set(&hand[x], &hand[y], &hand[z]) {
@@ -182,9 +199,12 @@ fn play_game() -> GameResult {
 fn main() {
     let mut results = GameResult(0, 0, 0, 0, 0, 0, 0);
 
-    /* Each iteration of this loop plays a game. */
-    for _x in 0..1_000_000 {
-        results += play_game();
+    let tasks: Vec<GameResult> = vec![GameResult(0, 0, 0, 0, 0, 0, 0); 1_000_000];
+
+    let completed: Vec<_> = tasks.par_iter().map(|result| play_game()).collect();
+
+    for task in completed {
+        results += task;
     }
 
     /* Report the findings about the games */
