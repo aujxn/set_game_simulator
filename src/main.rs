@@ -36,11 +36,11 @@ enum Set {
 
 /* Searches entire hand for sets */
 fn find_set_all(hand: &Vec<Card>) -> Set {
-    let indices = (0..hand.len()).combinations(3);
+    let indices = (0..hand.len()).tuple_combinations::<(_,_,_)>();
 
-    for trio in indices {
-        if is_set(&hand[trio[0]], &hand[trio[1]], &hand[trio[2]]) {
-            return Set::Found(trio[0], trio[1], trio[2]);
+    for (x, y, z) in indices {
+        if is_set(&hand[x], &hand[y], &hand[z]) {
+            return Set::Found(x, y, z);
         }
     }
     Set::NotFound()
@@ -51,10 +51,10 @@ fn find_set_all(hand: &Vec<Card>) -> Set {
  */
 fn find_set_part(hand: &Vec<Card>) -> Set {
     for i in hand.len() - 3..hand.len() {
-        let indices = (0..hand.len() - 3).combinations(2);
-        for duo in indices {
-            if is_set(&hand[duo[0]], &hand[duo[1]], &hand[i]) {
-                return Set::Found(duo[0], duo[1], i);
+        let indices = (0..hand.len() - 3).tuple_combinations();
+        for (x, y) in indices {
+            if is_set(&hand[x], &hand[y], &hand[i]) {
+                return Set::Found(x, y, i);
             }
         }
     }
@@ -183,7 +183,7 @@ fn main() {
     let mut results = GameResult(0, 0, 0, 0, 0, 0, 0);
 
     /* Each iteration of this loop plays a game. */
-    for _x in 0..10_000 {
+    for _x in 0..1_000_000 {
         results += play_game();
     }
 
