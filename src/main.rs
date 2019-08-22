@@ -17,6 +17,12 @@ struct Card(usize, usize, usize, usize);
 #[derive(Clone)]
 struct GameResult(i64, i64, i64, i64, i64, i64, i64);
 
+impl Default for GameResult {
+    fn default() -> Self {
+        GameResult(0, 0, 0, 0, 0, 0, 0)
+    }
+}
+
 impl Add for GameResult {
     type Output = Self;
 
@@ -196,44 +202,42 @@ fn play_game() -> GameResult {
 }
 
 fn main() {
-    let mut results = GameResult(0, 0, 0, 0, 0, 0, 0);
+    std::env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+
     let games = 1_000_000;
 
-    let tasks: Vec<GameResult> = vec![GameResult(0, 0, 0, 0, 0, 0, 0); games];
-
-    let completed: Vec<_> = tasks.par_iter().map(|_| play_game()).collect();
-
-    //let results = completed.par_iter().reduce(|| results, |a, b| a + b);
-
-    for task in completed {
-        results += task;
-    }
+    /* plays the game and sums all the results in parallel */
+    let results: GameResult = (0..games)
+        .into_par_iter()
+        .fold(|| GameResult::default(), |acc, _| acc + play_game())
+        .reduce(|| GameResult::default(), |acc, x| acc + x);
 
     /* Report the findings about the games */
-    println!("After {:?} games of simulated... \n\n", games);
+    log::info!("After {:?} games of simulated... \n\n", games);
 
-    println!("12 card hands with no sets: {:?}", results.0);
-    println!("12 card hands where set was found: {:?}", results.1);
-    println!(
+    log::info!("12 card hands with no sets: {:?}", results.0);
+    log::info!("12 card hands where set was found: {:?}", results.1);
+    log::info!(
         "proportion of 12s w/out sets: {:.3}%\n",
         100.0 * results.0 as f64 / results.1 as f64
     );
 
-    println!("15 card hands with no sets: {:?}", results.2);
-    println!("15 card hands where set was found: {:?}", results.3);
-    println!(
+    log::info!("15 card hands with no sets: {:?}", results.2);
+    log::info!("15 card hands where set was found: {:?}", results.3);
+    log::info!(
         "proportion of 15s w/out sets: {:.3}%\n",
         100.0 * results.2 as f64 / results.3 as f64
     );
 
-    println!("18 card hands with no sets: {:?}", results.4);
-    println!("18 card hands where set was found: {:?}", results.5);
-    println!(
+    log::info!("18 card hands with no sets: {:?}", results.4);
+    log::info!("18 card hands where set was found: {:?}", results.5);
+    log::info!(
         "proportion of 18s w/out sets: {:.3}%\n",
         100.0 * results.4 as f64 / results.5 as f64
     );
 
-    println!(
+    log::info!(
         "21 cards hands encountered: {:?}\n ({:?} games per 21 card hand)",
         results.6,
         games as i64 / results.6
