@@ -51,11 +51,13 @@ python3 ./python/graph.py
 ```
 
 ## TODO
-Add some more comments and a README for the data format
-Add command line argument for selecting number of games
-Have option for each run to accumulate data instead of wiping old data
-Analyze total number of sets at each point in the game
-Try removing random sets instead of the first set encountered
+<ul>
+<li>Add some more comments and a README for the data format</li>
+<li>Add command line argument for selecting number of games</li>
+<li>Have option for each run to accumulate data instead of wiping old data</li>
+<li>Analyze total number of sets at each point in the game</li>
+<li>Try removing random sets instead of the first set encountered</li>
+</ul>
 
 
 ## Credit
