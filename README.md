@@ -38,7 +38,7 @@ Make sure to include the release flag or it will take forever. The output data i
 cargo run --release
 ```
 
-And if you would like to generate the plotly graphs create and activate a python virtual environment and get the required libraries.
+And if you would like to generate the plotly graphs, create and activate a python virtual environment and get the required libraries.
 ```bash
 python3 -m venv venv
 source ./venv/bin/activate
@@ -59,8 +59,8 @@ Try removing random sets instead of the first set encountered
 
 
 ## Credit
-Inspired by analysis by [Peter Norvig] https://norvig.com/SET.html and [Don Knuth] https://cs.stanford.edu/~knuth/programs/setset-all.w
+Inspired by analysis by [Peter Norvig](https://norvig.com/SET.html) and [Don Knuth](https://cs.stanford.edu/~knuth/programs/setset-all.w)
 as well as conversations with Neil Babson.
 
 ## Licence
-[MIT] https://choosealicense.com/licenses/mit
+[MIT](https://choosealicense.com/licenses/mit)
