@@ -185,12 +185,13 @@ fn play_game() -> GameResult {
     let mut set = find_set_all(&hand);
 
     /* This is the loop that plays one entire game of set. */
-    for i in 0..24 {
+    loop {
         match set {
             Set::Found(x, y, z) => {
                 /* Add to the count that a set was found */
                 match hand.len() {
                     12 => {
+                        result.set12[23 - (deck.len() / 3)] += 1;
                         /* If the deck has 12 cards add 3 cards to the hand */
                         for _i in 0..3 {
                             match deck.pop() {
@@ -198,11 +199,10 @@ fn play_game() -> GameResult {
                                 None => return result,
                             }
                         }
-                        result.set12[i] += 1;
                     }
-                    15 => result.set15[i] += 1,
-                    18 => result.set18[i] += 1,
-                    21 => result.set21[i] += 1,
+                    15 => result.set15[23 - (deck.len() / 3)] += 1,
+                    18 => result.set18[23 - (deck.len() / 3)] += 1,
+                    21 => result.set21[23 - (deck.len() / 3)] += 1,
                     _ => {
                         println!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
@@ -224,9 +224,9 @@ fn play_game() -> GameResult {
             Set::NotFound() => {
                 /* update the count of hand with no sets */
                 match hand.len() {
-                    12 => result.setless12[i] += 1,
-                    15 => result.setless15[i] += 1,
-                    18 => result.setless18[i] += 1,
+                    12 => result.setless12[23 - (deck.len() / 3)] += 1,
+                    15 => result.setless15[23 - (deck.len() / 3)] += 1,
+                    18 => result.setless18[23 - (deck.len() / 3)] += 1,
                     _ => {
                         println!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
@@ -246,14 +246,13 @@ fn play_game() -> GameResult {
             }
         }
     }
-    result
 }
 
 fn main() {
     std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
-    let games = 100_000;
+    let games = 1_000_000_000;
 
     /* plays the game and sums all the results in parallel */
     let results: GameResult = (0..games)
