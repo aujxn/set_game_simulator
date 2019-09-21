@@ -50,6 +50,33 @@ The python script must be run from the root of the project to find the data file
 python3 ./python/graph.py
 ```
 
+## Results
+
+Here are the graphs from the 1_000_000_000 game run. The x-axis is how many times new cards have been added to the hand from the deck.
+The y-axis is the probability of a hand having no sets. Each graph represents a different size hand scenario.
+
+![](./resources/12.png)
+
+The 12 card hands act mostly as expected. The probability of a 12 card hand having no sets starts off low because the initial 12 cards are
+completely random. As the game is played and sets are removed and replaced with random cards, the probability of a setless 12 cards hand
+increases at a logarithmic rate. The 23rd (last) deal of cards into the hand is interesting, though. If there are only 12 cards remaining
+when the last cards are added from the deck into the hand the probability of a setless hand jumps to 11%.
+
+![](./resources/15.png)
+
+This is where things get very confusing. When 15 card hands are encountered after one and two deals (when either the original 12 has no sets
+or it has a set but the new 12 after has no sets) the probability of the 15 cards containing no sets is the highest. Followed by a sharp
+decline to the lowest probability at 5 deals where it nearly increases linearly from there.
+
+![](./resources/18.png)
+
+There might be some shape with the 18 card hand probabilities as well but because it is so unlikely that an 18 card hand contains no
+sets the data has a lot of noise in it. I might run it a few more times to see if it converges on some nice shape but I expect it would
+require a massive data set.
+
+I have a very limited understanding of combinatorics and graph theory so maybe the explanation is quite obvious. Regardless, I think this
+is a cool representaion of how emergent properties can result from a simple set of rules.
+
 ## TODO
 <ul>
 <li>Add some more comments and a README for the data format</li>
