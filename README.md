@@ -8,7 +8,7 @@ Randomly selecting cards you get the following probability of containing sets:
 <li>12 cards is .9677</li>
 <li>15 cards is .9996</li>
 <li>18 cards is .99999999</li>
-<\ul>
+</ul>
 
 In actual games 12 and 15 card hands have no sets much more often than this.
 This program investigates how the probability of encountering a hand with no sets changes as the game progresses.
