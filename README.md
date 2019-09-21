@@ -1,42 +1,62 @@
-Author: Austen Nelson
+# Set Simulator
 
-This program simulates set games to count how often hands contain no sets.
+This program simulates Set games to count how often hands contain no sets.
 
-The probability of a given hand containing no sets is quite low.
+The raw probability of a given hand containing no sets is quite low.
+Randomly selecting cards you get the following probability of containing sets:
+12 cards is .9677
+15 cards is .9996
+18 cards is .99999999
 
-For a 12 card hand it is a .9677 probability of containing a set.
-For a 15 card hand it is a .9996 probability of containing a set.
-For an 18 card hand it is a .99999999 probability of containing a set.
+In actual games 12 and 15 card hands have no sets much more often than this.
+This program investigates how the probability of encountering a hand with no sets changes as the game progresses.
 
-In actual games it seems like 12 and 15 card hands have no sets much more often than this.
-Is this a cognitive bias or does the probability of a hand containing a set decrease as sets are removed?
-Turns out the second seems to be true.
+Other's analysis has shown that the probability of getting hands with no sets in game is higher than randomly selecting cards.
+This leads to the intuitive hypothesis that as sets are removed from the hand and random cards replace them, the
+"quality" of the hand and deck decreases. By quality I mean the likelyhood of a hand, regardless of size, containing a set
+decreases as the game is played. When discussing this hypothesis with another math enthusiast they rejected it on the claim
+that 12 card hands would decrease in quality but the following 15 card hand would have a consistent probability of containing a set.
 
-According to this simulator, 18 card hands that are encountered in games actually have no sets about .1% of the time.
-Thats pretty cool. .1% is much higher than the expected 1.42 * 10^-6 % probability.
+It turns out we were both wrong. The probability is variable but in an interesting way. I don't currently have a convincing hypothesis why.
 
-Here is the output of the program run on 10 million games of set:
+## Running the Simulation
 
-setless 12's 14704847
-set 12's 215619108
-proportion of 12's 0.068198
+Included in the python folder is the output of the simulation run on 1_000_000_000 games.
+If you want to run this simulation yourself clone the repository.
+'''bash
+git clone https://github.com/aujxn/set_game_simulator.git
+cd set_game_simulator
+'''
 
-setless 15's 368864
-set 15's 14011627
-proportion of 15's 0.026326
+At this step you have enough to generate the raw data. To run the program you must have rustc or cargo installed.
+Make sure to include the release flag or it will take forever. The output data is exported to ./python/data.txt
+'''bash
+cargo run --release
+'''
 
-setless 18's 401
-set 18's 352049
-proportion of 18's 0.001139
+And if you would like to generate the plotly graphs create and activate a python virtual environment and get the required libraries.
+'''bash
+python3 -m venv venv
+source ./venv/bin/activate
+pip install -r requirements.txt
+'''
 
-set 21's 369
+The python script must be run from the root of the project to find the data file. Navigate to localhost:8050 in your browser to see the plots.
+'''
+python3 ./python/graph.py
+'''
+
+## TODO
+Add some more comments and a README for the data format
+Add command line argument for selecting number of games
+Have option for each run to accumulate data instead of wiping old data
+Analyze total number of sets at each point in the game
+Try removing random sets instead of the first set encountered
 
 
-A 21 card hand only happens a handful of times every 100,000 games but it is possible.
-
-This confirms the results that Peter Norvig found, but this program can run much larger tests in reasonable time.
-
+## Credit
 Inspired by analysis by Peter Norvig (norvig.com/SET.html) and Don Knuth (cs.stanford.edu/~knuth/programs/setset-all.w)
 as well as conversations with Neil Babson.
 
-This code is available under the MIT license.
+## Licence
+[MIT] https://choosealicense.com/licenses/mit

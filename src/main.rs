@@ -253,7 +253,7 @@ fn main() {
     std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
-    let games = 1_000_000_000;
+    let games = 100_000;
 
     /* plays the game and sums all the results in parallel */
     let results: GameResult = (0..games)
@@ -299,27 +299,6 @@ fn main() {
         set21,
         if set21 != 0 { games as i64 / set21 } else { 0 }
     );
-
-    /*
-    let prob12: Vec<f64> = results
-        .setless12
-        .iter()
-        .zip(results.set12.iter())
-        .map(|x| *x.0 as f64 / *x.1 as f64)
-        .collect();
-    let prob15: Vec<f64> = results
-        .setless15
-        .iter()
-        .zip(results.set15.iter())
-        .map(|x| *x.0 as f64 / *x.1 as f64)
-        .collect();
-    let prob18: Vec<f64> = results
-        .setless18
-        .iter()
-        .zip(results.set18.iter())
-        .map(|x| *x.0 as f64 / *x.1 as f64)
-        .collect();
-    */
 
     let setless12: String = results
         .setless12
