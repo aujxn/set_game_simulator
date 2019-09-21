@@ -4,12 +4,11 @@ This program simulates Set games to count how often hands contain no sets.
 
 The raw probability of a given hand containing no sets is quite low.
 Randomly selecting cards you get the following probability of containing sets:
-
-12 cards is .9677
-
-15 cards is .9996
-
-18 cards is .99999999
+<ul>
+<li>12 cards is .9677</li>
+<li>15 cards is .9996</li>
+<li>18 cards is .99999999</li>
+<\ul>
 
 In actual games 12 and 15 card hands have no sets much more often than this.
 This program investigates how the probability of encountering a hand with no sets changes as the game progresses.
@@ -20,7 +19,7 @@ This leads to the intuitive hypothesis that as sets are removed from the hand an
 decreases as the game is played. When discussing this hypothesis with another math enthusiast they rejected it on the claim
 that 12 card hands would decrease in quality but the following 15 card hand would have a consistent probability of containing a set.
 
-It turns out we were both wrong. The probability is variable but in an interesting way. I don't currently have a convincing hypothesis why.
+It turns out we were both wrong. The probability is variable but in an interesting way. I currently don't have a convincing hypothesis why.
 
 ## Running the Simulation
 
