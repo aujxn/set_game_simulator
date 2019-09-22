@@ -13,36 +13,71 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Add;
 use std::path::Path;
+use chrono::prelude::*;
 
-/* Each card has 4 characteristics that can have 3 states */
-struct Card(usize, usize, usize, usize);
+/* State for each characteristic of a card */
+#[derive(Copy, Clone)]
+enum State {
+    Zero,
+    One,
+    Two,
+}
+
+impl State {
+    pub fn new(state: usize) -> Self {
+        match state {
+            0 => State::Zero,
+            1 => State::One,
+            2 => State::Two,
+            _ => panic!("Impossible card state!"),
+        }
+    }
+}
+
+fn check(first: State, second: State, third: State) -> bool {
+    if (first as i32 + second as i32 + third as i32) % 3 == 0 {
+        return true;
+    } else {
+        false
+    }
+}
+
+/* Function to check if a trio of cards is a set. In the game of
+ * set every card has 4 attributes with 3 classes. 3 cards make a
+ * set if for each attribute the cards are of the same class or all
+ * different class. When the classes are represented by the numbers
+ * 0, 1, and 2 modulo 3 can be used to determine if each attribute
+ * passes the set requirements.
+ */
+fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
+    check(first.0, second.0, third.0)
+        && check(first.1, second.1, third.1)
+        && check(first.2, second.2, third.2)
+        && check(first.3, second.3, third.3)
+}
+
+impl Add for State {
+    type Output = i32;
+
+    fn add(self, other: Self) -> i32 {
+        self as i32 + other as i32
+    }
+}
+
+struct Card(State, State, State, State);
 
 /* Reports how many of each hand were encountered in what part of the game */
 #[derive(Clone)]
 struct GameResult {
-    set12: Vec<i64>,
-    set15: Vec<i64>,
-    set18: Vec<i64>,
-    set21: Vec<i64>,
-    setless12: Vec<i64>,
-    setless15: Vec<i64>,
-    setless18: Vec<i64>,
+    sets: Vec<Vec<i64>>,
+    setless: Vec<Vec<i64>>,
 }
 
 impl Default for GameResult {
-    /* The first vec is all the 12's, second is 15's, third is 18's, and last is 21's
-     * The tuples inside the vecs are the setless and with set counts
-     * The index of the tuples is the number of remaining cards in the deck divided by 3
-     */
     fn default() -> Self {
         GameResult {
-            set12: vec![0; 24],
-            set15: vec![0; 24],
-            set18: vec![0; 24],
-            set21: vec![0; 24],
-            setless12: vec![0; 24],
-            setless15: vec![0; 24],
-            setless18: vec![0; 24],
+            sets: vec![vec![0; 24], vec![0; 24], vec![0; 24], vec![0; 24]],
+            setless: vec![vec![0; 24], vec![0; 24], vec![0; 24]],
         }
     }
 }
@@ -52,6 +87,19 @@ impl Add for GameResult {
 
     fn add(self, other: Self) -> Self {
         Self {
+            sets: self
+                .sets
+                .iter()
+                .zip(other.sets.iter())
+                .map(|x| x.0.iter().zip(x.1.iter()).map(|y| y.0 + y.1).collect())
+                .collect(),
+            setless: self
+                .setless
+                .iter()
+                .zip(other.setless.iter())
+                .map(|x| x.0.iter().zip(x.1.iter()).map(|y| y.0 + y.1).collect())
+                .collect(),
+            /*
             set12: self
                 .set12
                 .iter()
@@ -94,6 +142,7 @@ impl Add for GameResult {
                 .zip(other.setless18.iter())
                 .map(|x| x.0 + x.1)
                 .collect(),
+            */
         }
     }
 }
@@ -132,24 +181,6 @@ fn find_set_part(hand: &[Card]) -> Set {
     Set::NotFound()
 }
 
-/* Function to check if a trio of cards is a set. In the game of
- * set every card has 4 attributes with 3 classes. 3 cards make a
- * set if for each attribute the cards are of the same class or all
- * different class. When the classes are represented by the numbers
- * 0, 1, and 2 modulo 3 can be used to determine if each attribute
- * passes the set requirements.
- */
-fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
-    if (first.0 + second.0 + third.0) % 3 == 0
-        && (first.1 + second.1 + third.1) % 3 == 0
-        && (first.2 + second.2 + third.2) % 3 == 0
-        && (first.3 + second.3 + third.3) % 3 == 0
-    {
-        return true;
-    }
-    false
-}
-
 /* Plays an entire game of set and returns some information */
 fn play_game() -> GameResult {
     let mut result = GameResult::default();
@@ -162,7 +193,12 @@ fn play_game() -> GameResult {
         for j in 0..3 {
             for k in 0..3 {
                 for l in 0..3 {
-                    deck.push(Card(i, j, k, l));
+                    deck.push(Card(
+                        State::new(i),
+                        State::new(j),
+                        State::new(k),
+                        State::new(l),
+                    ));
                 }
             }
         }
@@ -191,7 +227,7 @@ fn play_game() -> GameResult {
                 /* Add to the count that a set was found */
                 match hand.len() {
                     12 => {
-                        result.set12[23 - (deck.len() / 3)] += 1;
+                        result.sets[0][23 - (deck.len() / 3)] += 1;
                         /* If the deck has 12 cards add 3 cards to the hand */
                         for _i in 0..3 {
                             match deck.pop() {
@@ -200,9 +236,9 @@ fn play_game() -> GameResult {
                             }
                         }
                     }
-                    15 => result.set15[23 - (deck.len() / 3)] += 1,
-                    18 => result.set18[23 - (deck.len() / 3)] += 1,
-                    21 => result.set21[23 - (deck.len() / 3)] += 1,
+                    15 => result.sets[1][23 - (deck.len() / 3)] += 1,
+                    18 => result.sets[2][23 - (deck.len() / 3)] += 1,
+                    21 => result.sets[3][23 - (deck.len() / 3)] += 1,
                     _ => {
                         println!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
@@ -224,9 +260,9 @@ fn play_game() -> GameResult {
             Set::NotFound() => {
                 /* update the count of hand with no sets */
                 match hand.len() {
-                    12 => result.setless12[23 - (deck.len() / 3)] += 1,
-                    15 => result.setless15[23 - (deck.len() / 3)] += 1,
-                    18 => result.setless18[23 - (deck.len() / 3)] += 1,
+                    12 => result.setless[0][23 - (deck.len() / 3)] += 1,
+                    15 => result.setless[1][23 - (deck.len() / 3)] += 1,
+                    18 => result.setless[2][23 - (deck.len() / 3)] += 1,
                     _ => {
                         println!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
@@ -252,7 +288,7 @@ fn main() {
     std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
-    let games = 1_000_000_000;
+    let games = 1_000;
 
     /* plays the game and sums all the results in parallel */
     let results: GameResult = (0..games)
@@ -263,42 +299,95 @@ fn main() {
     /* Report the findings about the games */
     log::info!("After {:?} games of simulated... \n\n", games);
 
-    let setless12: i64 = results.setless12.iter().sum();
-    let setless15: i64 = results.setless15.iter().sum();
-    let setless18: i64 = results.setless18.iter().sum();
+    let setless = results
+        .setless
+        .iter()
+        .map(|x| x.iter().sum())
+        .collect::<Vec<i64>>();
+    let sets = results
+        .sets
+        .iter()
+        .map(|x| x.iter().sum())
+        .collect::<Vec<i64>>();
 
-    let set12: i64 = results.set12.iter().sum();
-    let set15: i64 = results.set15.iter().sum();
-    let set18: i64 = results.set18.iter().sum();
-    let set21: i64 = results.set21.iter().sum();
-
-    log::info!("12 card hands with no sets: {:?}", setless12);
-    log::info!("12 card hands where set was found: {:?}", set12);
+    log::info!("12 card hands with no sets: {:?}", setless[0]);
+    log::info!("12 card hands where set was found: {:?}", sets[0]);
     log::info!(
         "proportion of 12s w/out sets: {:.3}%\n",
-        100.0 * setless12 as f64 / set12 as f64
+        100.0 * setless[0] as f64 / sets[0] as f64
     );
 
-    log::info!("15 card hands with no sets: {:?}", setless15);
-    log::info!("15 card hands where set was found: {:?}", set15);
+    log::info!("15 card hands with no sets: {:?}", setless[1]);
+    log::info!("15 card hands where set was found: {:?}", sets[1]);
     log::info!(
         "proportion of 15s w/out sets: {:.3}%\n",
-        100.0 * setless15 as f64 / set15 as f64
+        100.0 * setless[1] as f64 / sets[1] as f64
     );
 
-    log::info!("18 card hands with no sets: {:?}", setless18);
-    log::info!("18 card hands where set was found: {:?}", set18);
+    log::info!("18 card hands with no sets: {:?}", setless[2]);
+    log::info!("18 card hands where set was found: {:?}", sets[2]);
     log::info!(
         "proportion of 18s w/out sets: {:.3}%\n",
-        100.0 * setless18 as f64 / set18 as f64
+        100.0 * setless[2] as f64 / sets[2] as f64
     );
 
     log::info!(
         "21 cards hands encountered: {:?}\n ({:?} games per 21 card hand)",
-        set21,
-        if set21 != 0 { games as i64 / set21 } else { 0 }
+        sets[3],
+        if sets[3] != 0 {
+            games as i64 / sets[3]
+        } else {
+            0
+        }
     );
 
+    let serialized: String =
+        itertools::join(
+            results
+                .setless
+                .iter()
+                .map(|x| itertools::join(x, " "))
+                .collect::<Vec<String>>(),
+            "\n") + "\n" + &
+        itertools::join(
+            results
+                .sets
+                .iter()
+                .map(|x| itertools::join(x, " "))
+                .collect::<Vec<String>>(),
+            "\n");
+
+    //print!("{:?}", serialized);
+
+    /*
+    let serialized: String = format!(
+        "{:?} {:?}",
+        results
+            .setless
+            .iter()
+            .flat_map(|x| format!(
+                "{:?}\n",
+                x.iter()
+                    .flat_map(|y| format!("{:?} ", y.to_string()).chars())
+                    .collect::<String>()
+            )
+            .chars())
+            .collect::<String>(),
+        results
+            .sets
+            .iter()
+            .flat_map(|x| format!(
+                "{:?}\n",
+                x.iter()
+                    .flat_map(|y| format!("{:?} ", y.to_string()).chars())
+                    .collect::<String>()
+            )
+            .chars())
+            .collect::<String>()
+    );
+    */
+
+    /*
     let setless12: String = results
         .setless12
         .iter()
@@ -329,8 +418,12 @@ fn main() {
         .iter()
         .map(|x| format!("{:?} ", x.to_string()))
         .collect();
+    */
 
-    let path = Path::new("python/data.txt");
+    let date: DateTime<Local> = Local::now();
+    let path_name = "python/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
+
+    let path = Path::new(&path_name);
     let display = path.display();
 
     let mut file = match File::create(&path) {
@@ -338,13 +431,7 @@ fn main() {
         Ok(file) => file,
     };
 
-    match file.write_all(
-        format!(
-            "{}\n{}\n{}\n{}\n{}\n{}",
-            setless12, set12, setless15, set15, setless18, set18
-        )
-        .as_bytes(),
-    ) {
+    match file.write_all(serialized.as_bytes()) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
         Ok(_) => log::info!("wrote data to {}", display),
     }
