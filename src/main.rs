@@ -131,15 +131,52 @@ fn find_set_all(hand: &[Card]) -> Set {
  * the last three cards in the hand
  */
 fn find_set_part(hand: &[Card]) -> Set {
-    for i in hand.len() - 3..hand.len() {
-        let indices = (0..hand.len() - 3).tuple_combinations();
-        for (x, y) in indices {
-            if is_set(&hand[x], &hand[y], &hand[i]) {
-                return Set::Found(x, y, i);
-            }
+    let len = hand.len();
+    let split = len - 3;
+    //let new_pairs: TupleCombinations<Range<usize>, (usize, usize)>  = (split..len).tuple_combinations();
+    //let old_pairs: TupleCombinations<Range<usize>, (usize, usize)>  = (len..split).tuple_combinations();
+
+    /* All combinations with 1 of the new cards */
+    for x in split..len {
+        if let Some((y, z)) = (0..split)
+            .into_iter()
+            .tuple_combinations()
+            .find(|(y, z)| is_set(&hand[x], &hand[*y], &hand[*z]))
+        {
+            return Set::Found(x, y, z);
         }
     }
+
+    for x in 0..split {
+        if let Some((y, z)) = (split..len)
+            .into_iter()
+            .tuple_combinations()
+            .find(|(y, z)| is_set(&hand[x], &hand[*y], &hand[*z]))
+        {
+            return Set::Found(x, y, z);
+        }
+    }
+
+    if is_set(&hand[split], &hand[split + 1], &hand[split + 2]) {
+        return Set::Found(split, split + 1, split + 2);
+    }
     Set::NotFound()
+
+    /*
+        /* All combinations with 2 of the new cards and one old */
+    new.iter().for_each(|x| old.iter().tuple_combinations().for_each(|(y, z)| {
+            if is_set(&hand[x], &hand[y], &hand[z]) {
+                return Set::Found(x, y, z);
+            }
+    });
+
+        /* The three new cards */
+            if is_set(&hand[split], &hand[split+1], &hand[split+2]) {
+                return Set::Found(x, y, z);
+            }
+            */
+
+    //    Set::NotFound()
 }
 
 /* Plays an entire game of set and returns some information */
