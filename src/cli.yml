@@ -1,0 +1,13 @@
+name: set_simulator
+version: "1.0"
+about: plays set and investigates probabilities
+author: Austen Nelson
+
+settings:
+   - ArgRequiredElseHelp
+
+args:
+   - games:
+      help: Number of games of set to simulate
+      index: 1
+      required: true

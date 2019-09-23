@@ -4,6 +4,8 @@
  * 8/19/2019
  */
 
+use chrono::prelude::*;
+use clap::App;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -13,7 +15,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::ops::Add;
 use std::path::Path;
-use chrono::prelude::*;
 
 /* State for each characteristic of a card */
 #[derive(Copy, Clone)]
@@ -23,6 +24,10 @@ enum State {
     Two,
 }
 
+/* A card has 4 characteristics that each have a state */
+struct Card(State, State, State, State);
+
+/* Constructor for creating a State of a card characteristic */
 impl State {
     pub fn new(state: usize) -> Self {
         match state {
@@ -34,18 +39,10 @@ impl State {
     }
 }
 
-fn check(first: State, second: State, third: State) -> bool {
-    if (first as i32 + second as i32 + third as i32) % 3 == 0 {
-        return true;
-    } else {
-        false
-    }
-}
-
 /* Function to check if a trio of cards is a set. In the game of
- * set every card has 4 attributes with 3 classes. 3 cards make a
- * set if for each attribute the cards are of the same class or all
- * different class. When the classes are represented by the numbers
+ * set every card has 4 attributes with 3 states. 3 cards make a
+ * set if for each attribute the cards are of the same state or all
+ * different states. When the states are represented by the numbers
  * 0, 1, and 2 modulo 3 can be used to determine if each attribute
  * passes the set requirements.
  */
@@ -56,23 +53,29 @@ fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
         && check(first.3, second.3, third.3)
 }
 
-impl Add for State {
-    type Output = i32;
-
-    fn add(self, other: Self) -> i32 {
-        self as i32 + other as i32
+/* Checks the states for a single characteristic of a card */
+fn check(first: State, second: State, third: State) -> bool {
+    if (first as i32 + second as i32 + third as i32) % 3 == 0 {
+        return true;
+    } else {
+        false
     }
 }
 
-struct Card(State, State, State, State);
-
-/* Reports how many of each hand were encountered in what part of the game */
+/* Reports how many of each hand were encountered in what part of the game
+ * See default implementation for description
+ */
 #[derive(Clone)]
 struct GameResult {
     sets: Vec<Vec<i64>>,
     setless: Vec<Vec<i64>>,
 }
 
+/* The sets vector contain 4 vectors. Index 0 to 3 have data for 12, 15, 18, and 21
+ * card hands respectively. The index of these 4 vectors represents the number of times
+ * cards have been dealt from the deck. The setless vector is the same, except without
+ * a vector for 21 card hands. This is because a 21 card hand must contain a set.
+ */
 impl Default for GameResult {
     fn default() -> Self {
         GameResult {
@@ -82,6 +85,7 @@ impl Default for GameResult {
     }
 }
 
+/* Simply combines GameResult values into a single result */
 impl Add for GameResult {
     type Output = Self;
 
@@ -99,58 +103,15 @@ impl Add for GameResult {
                 .zip(other.setless.iter())
                 .map(|x| x.0.iter().zip(x.1.iter()).map(|y| y.0 + y.1).collect())
                 .collect(),
-            /*
-            set12: self
-                .set12
-                .iter()
-                .zip(other.set12.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            set15: self
-                .set15
-                .iter()
-                .zip(other.set15.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            set18: self
-                .set18
-                .iter()
-                .zip(other.set18.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            set21: self
-                .set21
-                .iter()
-                .zip(other.set21.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            setless12: self
-                .setless12
-                .iter()
-                .zip(other.setless12.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            setless15: self
-                .setless15
-                .iter()
-                .zip(other.setless15.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            setless18: self
-                .setless18
-                .iter()
-                .zip(other.setless18.iter())
-                .map(|x| x.0 + x.1)
-                .collect(),
-            */
         }
     }
 }
 
 /* Reports findings of a single hand */
 enum Set {
-    /* First 3 are the indices of the cards in the hand */
-    Found(usize, usize, usize), // was there a set in the hand?
+    /* Set was found. Values are indices in hand of cards that complete a set */
+    Found(usize, usize, usize),
+    /* Set wasn't found */
     NotFound(),
 }
 
@@ -227,6 +188,7 @@ fn play_game() -> GameResult {
                 /* Add to the count that a set was found */
                 match hand.len() {
                     12 => {
+                        /* 23 - (deck.len() / 3) calculates how many times cards have been dealt */
                         result.sets[0][23 - (deck.len() / 3)] += 1;
                         /* If the deck has 12 cards add 3 cards to the hand */
                         for _i in 0..3 {
@@ -284,19 +246,8 @@ fn play_game() -> GameResult {
     }
 }
 
-fn main() {
-    std::env::set_var("RUST_LOG", "debug");
-    env_logger::init();
-
-    let games = 1_000;
-
-    /* plays the game and sums all the results in parallel */
-    let results: GameResult = (0..games)
-        .into_par_iter()
-        .fold(|| GameResult::default(), |acc, _| acc + play_game())
-        .reduce(|| GameResult::default(), |acc, x| acc + x);
-
-    /* Report the findings about the games */
+/* Report the findings about the games */
+fn report(results: &GameResult, games: i64) {
     log::info!("After {:?} games of simulated... \n\n", games);
 
     let setless = results
@@ -340,99 +291,76 @@ fn main() {
             0
         }
     );
+}
 
-    let serialized: String =
-        itertools::join(
-            results
-                .setless
-                .iter()
-                .map(|x| itertools::join(x, " "))
-                .collect::<Vec<String>>(),
-            "\n") + "\n" + &
-        itertools::join(
+/* Exports results to an external data file */
+fn write_results(results: &GameResult) {
+    /* Serialize the data into a string so it can be published to an external file */
+    let serialized: String = itertools::join(
+        results
+            .setless
+            .iter()
+            .map(|x| itertools::join(x, " "))
+            .collect::<Vec<String>>(),
+        "\n",
+    ) + "\n"
+        + &itertools::join(
             results
                 .sets
                 .iter()
                 .map(|x| itertools::join(x, " "))
                 .collect::<Vec<String>>(),
-            "\n");
+            "\n",
+        );
 
-    //print!("{:?}", serialized);
-
-    /*
-    let serialized: String = format!(
-        "{:?} {:?}",
-        results
-            .setless
-            .iter()
-            .flat_map(|x| format!(
-                "{:?}\n",
-                x.iter()
-                    .flat_map(|y| format!("{:?} ", y.to_string()).chars())
-                    .collect::<String>()
-            )
-            .chars())
-            .collect::<String>(),
-        results
-            .sets
-            .iter()
-            .flat_map(|x| format!(
-                "{:?}\n",
-                x.iter()
-                    .flat_map(|y| format!("{:?} ", y.to_string()).chars())
-                    .collect::<String>()
-            )
-            .chars())
-            .collect::<String>()
-    );
-    */
-
-    /*
-    let setless12: String = results
-        .setless12
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    let set12: String = results
-        .set12
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    let setless15: String = results
-        .setless15
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    let set15: String = results
-        .set15
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    let setless18: String = results
-        .setless18
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    let set18: String = results
-        .set18
-        .iter()
-        .map(|x| format!("{:?} ", x.to_string()))
-        .collect();
-    */
-
+    /* Create the output filename using the current date/time */
     let date: DateTime<Local> = Local::now();
-    let path_name = "python/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
+    let path_name =
+        "python/data/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
 
+    /* Create the path to write file to */
     let path = Path::new(&path_name);
     let display = path.display();
 
+    /* Make the file */
     let mut file = match File::create(&path) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
         Ok(file) => file,
     };
 
+    /* Write the data to the file */
     match file.write_all(serialized.as_bytes()) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
         Ok(_) => log::info!("wrote data to {}", display),
     }
+}
+
+/* CLI crate macros */
+#[macro_use]
+extern crate clap;
+
+fn main() {
+    /* Initialization */
+    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_BACKTRACE", "full");
+    env_logger::init();
+
+    /* CLI configuration and parsing */
+    let yml = load_yaml!("cli.yml");
+    let args = App::from_yaml(yml).get_matches();
+    let games: i64 = if let Some(games) = args.value_of("games") {
+        games.parse().unwrap()
+    } else {
+        panic!("number of games not provided");
+    };
+
+    /* plays the game and sums all the results in parallel */
+    let results: GameResult = (0..games)
+        .into_par_iter()
+        .fold(|| GameResult::default(), |acc, _| acc + play_game())
+        .reduce(|| GameResult::default(), |acc, x| acc + x);
+
+    /* Finalize */
+    report(&results, games);
+    write_results(&results);
 }
