@@ -23,7 +23,9 @@ It turns out we were both wrong. The probability is variable but in an interesti
 
 ## Running the Simulation
 
-Included in the python folder is the output of the simulation run on 1_000_000_000 games.
+Included in the python/data/ folder is the output of the simulation run a number of times.
+This folder keeps growing the more I run the simulation.
+To start fresh, delete the contents of this folder.
 
 If you want to run this simulation yourself clone the repository.
 ```bash
@@ -32,9 +34,12 @@ cd set_game_simulator
 ```
 
 At this step you have enough to generate the raw data. To run the program you must have rustc or cargo installed.
-Make sure to include the release flag or it will take forever. The output data is exported to ./python/data.txt
+Replace <number_of_games> with how many games you would like to run. On my very old quad core AMD 1_000_000 games
+takes about 5 seconds. The program utilizes however many cores your machine has available using the Rayon crate.
+Make sure to include the release flag or it will take forever. The output data is exported to ./python/data.txt.
+The program must be run from the project root so it can find the output folder for the data.
 ```bash
-cargo run --release
+cargo run --release <number_of_games>
 ```
 
 And if you would like to generate the plotly graphs, create and activate a python virtual environment and get the required libraries.
@@ -44,14 +49,16 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The python script must be run from the root of the project to find the data file. Navigate to localhost:8050 in your browser to see the plots.
+The python script must alse be run from the project root to find the data file.
+Navigate to localhost:8050 in your browser to see the plots.
 ```bash
 python3 ./python/graph.py
 ```
 
 ## Results
 
-Here are the graphs from the 1_000_000_000 game run. The x-axis is how many times new cards have been added to the hand from the deck.
+Here are the graphs from a 1_000_000_000 game run. The x-axis is how many times new cards have been added to the hand from the deck.
+This means the further right on the graph is further along in the game.
 The y-axis is the probability of a hand having no sets. Each graph represents a different size hand scenario.
 
 ![](./resources/12.png)
@@ -79,8 +86,6 @@ is a cool representaion of how emergent properties can result from a simple set 
 ## TODO
 <ul>
 <li>Add some more comments and a README for the data format</li>
-<li>Add command line argument for selecting number of games</li>
-<li>Have option for each run to accumulate data instead of wiping old data</li>
 <li>Analyze total number of sets at each point in the game</li>
 <li>Try removing random sets instead of the first set encountered</li>
 </ul>
