@@ -90,8 +90,8 @@ the trend would become more obvious but the results are still quite noisy.
 
 I am interested in why the last deal breaks the trends for every hand size in an alternating manner. I think the next step to investigate
 this phenomenon is to look at the total number of sets in the hand at every point in the game and see how it develops. Another concern I
-have is that these particular findings are a result of how I am searching for and removing sets from the game. My function that finds all
-the sets searches in the same order every time and removes the first set it encounters. I could see this affecting the results by favoring
+have is that these particular findings are a result of how I am searching for and removing sets from the game. My functions that find a
+set search in the same order every time and removes the first set it encounters. I could see this affecting the results by favoring
 sets that don't contain the new cards because it begins by looking at the begining of the hand. To make it more "human-like" I could find all
 the sets in a hand and randomly select one to remove from the deck. Arguably, this still isn't very human like. A basic strategy for a human
 could be taking a survey of which attribute states are most or least common and generating some intuition on which cards are most likely
