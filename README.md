@@ -57,7 +57,8 @@ python3 ./python/graph.py
 
 ## Results
 
-Here are the graphs from a 1_000_000_000 game run. The x-axis is how many times new cards have been added to the hand from the deck.
+Here are the graphs from the data in ./python/data. This data represents >5 billion games of set played.
+The x-axis is how many times new cards have been added to the hand from the deck.
 This means the further right on the graph is further along in the game.
 The y-axis is the probability of a hand having no sets. Each graph represents a different size hand scenario.
 
@@ -72,13 +73,29 @@ when the last cards are added from the deck into the hand the probability of a s
 
 This is where things get very confusing. When 15 card hands are encountered after one and two deals (when either the original 12 has no sets
 or it has a set but the new 12 after has no sets) the probability of the 15 cards containing no sets is the highest. Followed by a sharp
-decline to the lowest probability at 5 deals where it nearly increases linearly from there. The drop off at the end is also peculiar.
+decline to the second lowest probability at 5 deals.
+From deal 5 to deal 22 the probability increases linearly, but the 23 deal has the lowest probability.
 
 ![](./resources/18.png)
 
-There might be some shape with the 18 card hand probabilities as well but because it is so unlikely that an 18 card hand contains no
-sets the data has a lot of noise in it. I might run it a few more times to see if it converges on some nice shape but I expect it would
-require a massive data set.
+At first glance the probability of an 18 card hand looks fairly consistent except for the anomaly of the last deal from the deck. It is
+interesting that the last deal has about 12 times the probability of containing no sets.
+
+![](./resources/18_zoom.png)
+
+After focusing in on those lower data points some wavy shape is identifiable. I ran this overnight, over 5 billion games, to see if
+the trend would become more obvious but the results are still quite noisy.
+
+## Summary
+
+I am interested in why the last deal breaks the trends for every hand size in an alternating manner. I think the next step to investigate
+this phenomenon is to look at the total number of sets in the hand at every point in the game and see how it develops. Another concern I
+have is that these particular findings are a result of how I am searching for and removing sets from the game. My function that finds all
+the sets searches in the same order every time and removes the first set it encounters. I could see this affecting the results by favoring
+sets that don't contain the new cards because it begins by looking at the begining of the hand. To make it more "human-like" I could find all
+the sets in a hand and randomly select one to remove from the deck. Arguably, this still isn't very human like. A basic strategy for a human
+could be taking a survey of which attribute states are most or least common and generating some intuition on which cards are most likely
+to be part of sets.
 
 I have a very limited understanding of combinatorics and graph theory so maybe the explanation is quite obvious. Regardless, I think this
 is a cool representaion of how emergent properties can result from a simple set of rules.

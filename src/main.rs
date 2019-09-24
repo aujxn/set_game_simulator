@@ -56,7 +56,7 @@ fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
 /* Checks the states for a single characteristic of a card */
 fn check(first: State, second: State, third: State) -> bool {
     if (first as i32 + second as i32 + third as i32) % 3 == 0 {
-        return true;
+        true
     } else {
         false
     }
@@ -117,13 +117,13 @@ enum Set {
 
 /* Searches entire hand for sets */
 fn find_set_all(hand: &[Card]) -> Set {
-    let indices = (0..hand.len()).tuple_combinations::<(_, _, _)>();
-
-    for (x, y, z) in indices {
-        if is_set(&hand[x], &hand[y], &hand[z]) {
-            return Set::Found(x, y, z);
-        }
+    if let Some((x, y, z)) = (0..hand.len())
+        .tuple_combinations::<(_, _, _)>()
+        .find(|(x, y, z)| is_set(&hand[*x], &hand[*y], &hand[*z]))
+    {
+        return Set::Found(x, y, z);
     }
+
     Set::NotFound()
 }
 
@@ -133,13 +133,10 @@ fn find_set_all(hand: &[Card]) -> Set {
 fn find_set_part(hand: &[Card]) -> Set {
     let len = hand.len();
     let split = len - 3;
-    //let new_pairs: TupleCombinations<Range<usize>, (usize, usize)>  = (split..len).tuple_combinations();
-    //let old_pairs: TupleCombinations<Range<usize>, (usize, usize)>  = (len..split).tuple_combinations();
 
     /* All combinations with 1 of the new cards */
     for x in split..len {
         if let Some((y, z)) = (0..split)
-            .into_iter()
             .tuple_combinations()
             .find(|(y, z)| is_set(&hand[x], &hand[*y], &hand[*z]))
         {
@@ -147,9 +144,9 @@ fn find_set_part(hand: &[Card]) -> Set {
         }
     }
 
+    /* All combinations with 2 of the new cards */
     for x in 0..split {
         if let Some((y, z)) = (split..len)
-            .into_iter()
             .tuple_combinations()
             .find(|(y, z)| is_set(&hand[x], &hand[*y], &hand[*z]))
         {
@@ -157,33 +154,17 @@ fn find_set_part(hand: &[Card]) -> Set {
         }
     }
 
+    /* Check if the three new cards make a set */
     if is_set(&hand[split], &hand[split + 1], &hand[split + 2]) {
         return Set::Found(split, split + 1, split + 2);
     }
+
+    /* Otherwise, there are no sets in the hand */
     Set::NotFound()
-
-    /*
-        /* All combinations with 2 of the new cards and one old */
-    new.iter().for_each(|x| old.iter().tuple_combinations().for_each(|(y, z)| {
-            if is_set(&hand[x], &hand[y], &hand[z]) {
-                return Set::Found(x, y, z);
-            }
-    });
-
-        /* The three new cards */
-            if is_set(&hand[split], &hand[split+1], &hand[split+2]) {
-                return Set::Found(x, y, z);
-            }
-            */
-
-    //    Set::NotFound()
 }
 
-/* Plays an entire game of set and returns some information */
-fn play_game() -> GameResult {
-    let mut result = GameResult::default();
-
-    /* This is the data structure for the full deck */
+/* Builds the deck for a game of set */
+fn shuffle_cards() -> Vec<Card> {
     let mut deck: Vec<Card> = vec![];
 
     /* Builds all the cards in the deck */
@@ -205,6 +186,16 @@ fn play_game() -> GameResult {
     /* Randomize the cards */
     deck.shuffle(&mut thread_rng());
 
+    deck
+}
+
+/* Plays an entire game of set and returns some information */
+fn play_game() -> GameResult {
+    let mut result = GameResult::default();
+
+    /* This is the data structure for the cards that haven't been dealt to the hand */
+    let mut deck = shuffle_cards();
+
     let mut hand = vec![]; //cards in the hand
 
     /* Get the first 12 cards for the hand from the deck */
@@ -215,7 +206,7 @@ fn play_game() -> GameResult {
         }
     }
 
-    /* Find the first set, primes the game loop for how it is currently structured. */
+    /* Find the first set, primes the game loop */
     let mut set = find_set_all(&hand);
 
     /* This is the loop that plays one entire game of set. */
@@ -394,6 +385,13 @@ fn main() {
     /* plays the game and sums all the results in parallel */
     let results: GameResult = (0..games)
         .into_par_iter()
+        /* The reason fold and reduce are needed here is because of the way Rayon's parallel
+         * iterator works. Fold allows the identity function (its first argument) to return a type
+         * that is different from the type of thing we are iterating over (integers in this case).
+         * Fold results in an iterator over GameResults that were created by breaking the original
+         * iterator into the pieces that were distributed over threads. This is why reduce is
+         * required to get the final sum.
+         */
         .fold(|| GameResult::default(), |acc, _| acc + play_game())
         .reduce(|| GameResult::default(), |acc, x| acc + x);
 
