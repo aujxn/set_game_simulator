@@ -5,14 +5,17 @@
  * data is then written to an external file.
  */
 
+use crate::{
+    deck, set,
+    set::{Card, Set},
+};
 use chrono::prelude::*;
-use rayon::prelude::*;
 use itertools::Itertools;
-use std::path::Path;
+use rayon::prelude::*;
 use std::error::Error;
 use std::fs::File;
-use crate::{set, set::{Card, Set}, deck};
 use std::io::prelude::*;
+use std::path::Path;
 
 /* Reports how many of each hand were encountered in what part of the game
  * See default implementation for description
@@ -281,7 +284,7 @@ fn write_results(results: &GameResult) {
     /* Create the output filename using the current date/time */
     let date: DateTime<Local> = Local::now();
     let path_name =
-        "python/data/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
+        "python/data/rm_first/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
 
     /* Create the path to write file to */
     let path = Path::new(&path_name);
@@ -299,4 +302,3 @@ fn write_results(results: &GameResult) {
         Ok(_) => log::info!("wrote data to {}", display),
     }
 }
-

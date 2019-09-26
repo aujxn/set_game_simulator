@@ -3,7 +3,7 @@
  */
 
 /* State for each characteristic of a card */
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum State {
     Zero,
     One,
@@ -11,6 +11,7 @@ pub enum State {
 }
 
 /* A card has 4 characteristics that each have a state */
+#[derive(Debug)]
 pub struct Card(pub State, pub State, pub State, pub State);
 
 /* Constructor for creating a State of a card characteristic */

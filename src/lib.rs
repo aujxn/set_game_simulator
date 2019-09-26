@@ -1,4 +1,4 @@
-pub mod rm_first_set;
-pub mod find_all_sets;
 mod deck;
+pub mod find_all_sets;
+pub mod rm_first_set;
 mod set;

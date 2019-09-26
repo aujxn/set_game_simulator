@@ -9,7 +9,7 @@
 extern crate clap;
 extern crate set_simulator;
 
-pub use crate::set_simulator::rm_first_set;
+pub use crate::set_simulator::{find_all_sets, rm_first_set};
 use clap::App;
 
 fn main() {
@@ -27,5 +27,7 @@ fn main() {
         panic!("number of games not provided");
     };
 
-    rm_first_set::run(games);
+    // rm_first_set::run(games);
+
+    find_all_sets::run(games);
 }

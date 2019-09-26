@@ -1,9 +1,9 @@
 /* This module builds a deck of cards and shuffles them so games of set can
  * be simulated.
  */
+use crate::set::{Card, State};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use crate::set::{Card, State};
 
 /* Builds the deck for a game of set */
 pub fn shuffle_cards() -> Vec<Card> {
@@ -30,4 +30,3 @@ pub fn shuffle_cards() -> Vec<Card> {
 
     deck
 }
-
