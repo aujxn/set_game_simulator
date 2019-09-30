@@ -21,13 +21,9 @@ fn main() {
     /* CLI configuration and parsing */
     let yml = load_yaml!("cli.yml");
     let args = App::from_yaml(yml).get_matches();
-    let games: i64 = if let Some(games) = args.value_of("games") {
-        games.parse().unwrap()
-    } else {
-        panic!("number of games not provided");
-    };
-
-    // rm_first_set::run(games);
-
-    find_all_sets::run(games);
+    match args.subcommmand() {
+        Some("rmfirst", Some(games)) => rm_first_set::run(games.parse().unwrap()),
+        Some("findall", Some(games)) => find_all_sets::run(games.parse().unwrap()),
+        None => unreachable!(), //clap app settings displays usage if no subcommand is provided
+    }
 }

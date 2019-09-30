@@ -5,9 +5,25 @@ author: Austen Nelson
 
 settings:
    - ArgRequiredElseHelp
+   - SubCommandRequiredElseHelp
 
-args:
-   - games:
-      help: Number of games of set to simulate
-      index: 1
-      required: true
+subcommands:
+   - findall:
+      about: finds all the sets in the hand and removes a random set
+      version: "0.1"
+      author: Austen Nelson
+      args:
+         - games:
+            help: Number of games of set to simulate
+            index: 1
+            required: true
+
+   - rmfirst:
+      about: removes the first set that is encounted when searching the hand
+      version: "0.1"
+      author: Austen Nelson
+      args:
+         - games:
+            help: Number of games of set to simulate
+            index: 1
+            required: true
