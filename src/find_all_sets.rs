@@ -16,71 +16,72 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 
+/* A set is 3 indices in the hand */
 #[derive(Clone, Copy, Debug)]
-struct Set(usize, usize, usize);
+struct Set {
+    indices: [usize; 3],
+}
 
 impl Set {
+    /* Checks if a set shares cards with another set */
     fn no_share(self, other: &Self) -> bool {
-        self.0 != other.0
-            && self.0 != other.1
-            && self.0 != other.2
-            && self.1 != other.0
-            && self.1 != other.1
-            && self.1 != other.2
-            && self.2 != other.0
-            && self.2 != other.1
-            && self.2 != other.2
+        if let Some(_) = self.indices.iter().find(|&&x| {
+            if let Some(_) = other
+                .indices
+                .iter()
+                .find(|&&y| self.indices[x] == other.indices[y])
+            {
+                true
+            } else {
+                false
+            }
+        }) {
+            return false;
+        }
+        true
     }
 
+    /* other is being removed from the hand.
+     * known sets that have indices that come after the cards that
+     * are being removed must be decremented so they are still valid.
+     */
     fn shift(&mut self, other: &Self) {
-        let mut shift0 = 0;
-        let mut shift1 = 0;
-        let mut shift2 = 0;
+        /* determines how much and which indices need changing */
+        let shift: Vec<usize> = self
+            .indices
+            .iter()
+            .map(|x| {
+                other
+                    .indices
+                    .iter()
+                    .filter(|y| x > y)
+                    .fold(0, |acc, _| acc + 1)
+            })
+            .collect();
 
-        if self.0 > other.0 {
-            shift0 += 1;
-        }
-        if self.0 > other.1 {
-            shift0 += 1;
-        }
-        if self.0 > other.2 {
-            shift0 += 1;
-        }
-        if self.1 > other.0 {
-            shift1 += 1;
-        }
-        if self.1 > other.1 {
-            shift1 += 1;
-        }
-        if self.1 > other.2 {
-            shift1 += 1;
-        }
-        if self.2 > other.0 {
-            shift2 += 1;
-        }
-        if self.2 > other.1 {
-            shift2 += 1;
-        }
-        if self.2 > other.2 {
-            shift2 += 1;
-        }
-
-        self.0 -= shift0;
-        self.1 -= shift1;
-        self.2 -= shift2;
+        /* updates indices */
+        shift
+            .iter()
+            .enumerate()
+            .for_each(|(i, x)| self.indices[i] -= x);
     }
 }
 
+/* represents the current cards that are in play */
 struct Hand {
     cards: Vec<Card>,
+
+    /* All known sets in the hand.
+     * Tracking this prevents duplication of work
+     */
     sets: Vec<Set>,
 }
 
 impl Hand {
+    /* creates a hand by getting 12 cards from the deck */
     fn new(deck: &mut Vec<Card>) -> Self {
         let mut cards = vec![];
 
-        /* Get the first 12 cards for the hand from the deck */
         for _i in 0..12 {
             match deck.pop() {
                 Some(x) => cards.push(x),
@@ -88,51 +89,71 @@ impl Hand {
             }
         }
 
+        /* finds all the sets in the first 9 cards of the hand.
+         * the reasoning behind this is making the game loop more simple.
+         * as the game is played, 3 cards are added to the hand.
+         * because the hand struct keeps track of all of the sets,
+         * the find_sets function only has to search for sets that contain
+         * the new cards. so to start the game loop, this sets up the hand
+         */
         let sets: Vec<Set> = (0..9)
             .tuple_combinations::<(_, _, _)>()
             .filter(|(x, y, z)| set::is_set(&cards[*x], &cards[*y], &cards[*z]))
-            .map(|(x, y, z)| Set(x, y, z))
+            .map(|(x, y, z)| Set { indices: [x, y, z] })
             .collect();
 
         Hand { cards, sets }
     }
 
+    /* finds all the sets in the hand that contain any of the new cards */
     fn find_sets(&mut self, deck_len: usize) -> Info {
         let len = self.cards.len();
-        let split = len - 3;
+        let split = len - 3; //the divider between old and new cards
+
+        /* calculates how many times cards have been removed from the deck */
         let deals = 23 - (deck_len / 3);
 
+        /* searches for sets that have one of the new cards */
         for x in split..len {
             self.sets.append(
                 &mut (0..split)
                     .tuple_combinations()
                     .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set(x, y, z))
+                    .map(|(y, z)| Set { indices: [x, y, z] })
                     .collect(),
             );
         }
 
+        /* searches for sets that have two of the new cards */
         for x in 0..split {
             self.sets.append(
                 &mut (split..len)
                     .tuple_combinations()
                     .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set(x, y, z))
+                    .map(|(y, z)| Set { indices: [x, y, z] })
                     .collect(),
             );
         }
 
+        /* do the three new cards make a set? */
         if set::is_set(
             &self.cards[split],
             &self.cards[split + 1],
             &self.cards[split + 2],
         ) {
-            self.sets.push(Set(split, split + 1, split + 2));
+            self.sets.push(Set {
+                indices: [split, split + 1, split + 2],
+            });
         }
 
         Info {
+            /* TODO: change this from clone to catagorizing of some type.
+             * currently needless information is logged and program consumes
+             * insane memory very quickly
+             */
             sets: self.sets.clone(),
-            hand_size: self.cards.len(),
+
+            hand_size: len,
             deals: deals,
         }
     }
@@ -142,7 +163,7 @@ impl Hand {
         for set in &mut self.sets {
             set.shift(to_rm);
         }
-        let mut a = [to_rm.0, to_rm.1, to_rm.2];
+        let mut a = [to_rm.indices[0], to_rm.indices[1], to_rm.indices[2]];
         a.sort();
         self.cards.remove(a[2]);
         self.cards.remove(a[1]);
@@ -150,19 +171,29 @@ impl Hand {
     }
 }
 
+/* records info about a hand
+ * TODO: change to catagorical type to reduce memory load
+ */
 #[derive(Debug)]
 pub struct Info {
-    sets: Vec<Set>,
-    hand_size: usize,
-    deals: usize,
+    sets: Vec<Set>,   //all of the found sets
+    hand_size: usize, //number of cards in the hand
+    deals: usize,     //how many times cards have been removed from deck
 }
 
 impl Info {
+    /* serializes the info to be written to an external file
+     * TODO: will have to change with info rework
+     */
     fn serde(&self) -> String {
         let sets = itertools::join(
-            self.sets
-                .iter()
-                .map(|Set(x, y, z)| x.to_string() + " " + &y.to_string() + " " + &z.to_string()),
+            self.sets.iter().map(|x| {
+                x.indices[0].to_string()
+                    + " "
+                    + &x.indices[1].to_string()
+                    + " "
+                    + &x.indices[2].to_string()
+            }),
             "|",
         );
 
@@ -176,6 +207,7 @@ impl Info {
     }
 }
 
+/* plays an entire game of set and finds every set in every hand */
 pub fn play_game() -> Vec<Info> {
     let mut deck = deck::shuffle_cards();
     let mut hand = Hand::new(&mut deck);
@@ -185,6 +217,7 @@ pub fn play_game() -> Vec<Info> {
         let info = hand.find_sets(deck.len());
         let sets = info.sets.len();
 
+        /* if sets were found then choose a random set and remove it */
         if sets > 0 {
             let to_rm = rand::thread_rng().gen_range(0, info.sets.len());
             hand.rm_set(&info.sets[to_rm]);
@@ -192,6 +225,7 @@ pub fn play_game() -> Vec<Info> {
 
         data.push(info);
 
+        /* condition where hand needs a deal */
         if sets == 0 || hand.cards.len() < 12 {
             for _i in 0..3 {
                 match deck.pop() {
@@ -203,8 +237,10 @@ pub fn play_game() -> Vec<Info> {
     }
 }
 
-pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<usize>>, games: i64) {
-
+/* exports data to the file. experimenting with channels to achieve concurrency.
+ * channel does not seem to be the bottleneck of the program.
+ */
+pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<bool>>, games: i64) {
     let path_name = "python/data/find_all/data.csv";
 
     /* Create the path to write file to */
@@ -217,6 +253,7 @@ pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<usize>>
         Ok(file) => file,
     };
 
+    /* counts games played */
     let mut counter = 0;
     loop {
         match info.recv() {
@@ -226,69 +263,65 @@ pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<usize>>
                     "\n",
                 ) + "\n";
                 /* Write the data to the file */
+                /* TODO: change to a buffer instead of doing millions of writes */
                 match file.write_all(serialized.as_bytes()) {
                     Err(why) => panic!("couldn't create {}: {}", display, why.description()),
                     Ok(_) => (),
                 }
                 counter += 1;
             }
-            Err(_) => ()
+            Err(_) => (),
         }
 
+        /* games played reaches games desired so kill the loop */
         if counter == games {
             break;
         }
     }
 
+    /* kill all the worker (simulation) threads */
+    /* TODO: ask someone who knows things if this is a sensible way to handle concurrency */
     for rx in kill {
-        rx.send(1);
+        /* i don't care if this succeeds/fails because my work is all done
+         * and im just trying to shut down nicely.
+         * and i just want rust to be happy.
+         * this doesn't seem very "correct"
+         */
+        match rx.send(true) {
+            Err(_) => (),
+            Ok(_) => (),
+        }
     }
 }
 
+/* runs the simulation */
 pub fn run(games: i64) {
-    let (tx1, rx) = mpsc::channel();
-    let tx2 = mpsc::Sender::clone(&tx1);
-    let tx3 = mpsc::Sender::clone(&tx1);
-    let tx4 = mpsc::Sender::clone(&tx1);
+    /* number of threads playing set games */
+    let workers = 4;
 
-    let (kill1, r1) = mpsc::channel();
-    let (kill2, r2) = mpsc::channel();
-    let (kill3, r3) = mpsc::channel();
-    let (kill4, r4) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
 
-    thread::spawn(move || loop {
-        tx1.send(play_game());
-        match r1.try_recv() {
-            Ok(_) => break,
-            Err(_) => (),
-        }
-    });
+    /* clone the transmitter for each worker */
+    let txs = (0..workers)
+        .map(|_| mpsc::Sender::clone(&tx))
+        .collect::<Vec<mpsc::Sender<Vec<Info>>>>();
 
-    thread::spawn(move || loop {
-        tx2.send(play_game());
-        match r2.try_recv() {
-            Ok(_) => break,
-            Err(_) => (),
-        }
-    });
+    /* create a way to shut down each thread */
+    let (kill_txs, kill_rxs): (Vec<mpsc::Sender<bool>>, Vec<mpsc::Receiver<bool>>) =
+        (0..workers).map(|_| &mpsc::channel()).unzip();
 
-    thread::spawn(move || loop {
-        tx3.send(play_game());
-        match r3.try_recv() {
-            Ok(_) => break,
-            Err(_) => (),
-        }
-    });
+    /* spawn the worker threads */
+    for i in 0..workers {
+        thread::spawn(move || loop {
+            txs[i].send(play_game());
+            match kill_rxs[i].try_recv() {
+                Ok(_) => break,
+                Err(_) => (),
+            }
+        });
+    }
 
-    thread::spawn(move || loop {
-        tx4.send(play_game());
-        match r4.try_recv() {
-            Ok(_) => break,
-            Err(_) => (),
-        }
-    });
-
-    let writer = thread::spawn(move || write_out(rx, vec![kill1, kill2, kill3, kill4], games));
-
+    /* create a thread to do the exporting. */
+    let writer = thread::spawn(move || write_out(rx, kill_txs, games));
     writer.join().unwrap();
 }

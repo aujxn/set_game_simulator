@@ -283,8 +283,9 @@ fn write_results(results: &GameResult) {
 
     /* Create the output filename using the current date/time */
     let date: DateTime<Local> = Local::now();
-    let path_name =
-        "python/data/rm_first/".to_string() + &date.format("%Y-%m-%d_%H:%M:%S").to_string() + ".txt";
+    let path_name = "python/data/rm_first/".to_string()
+        + &date.format("%Y-%m-%d_%H:%M:%S").to_string()
+        + ".txt";
 
     /* Create the path to write file to */
     let path = Path::new(&path_name);
