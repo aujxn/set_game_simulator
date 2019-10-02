@@ -6,15 +6,15 @@
  * also removes a random set instead of the first set found.
  */
 
-use crate::{deck, set, set::Card};
+use crate::{deck, set, set::Card, thread_pool::ThreadPool};
+use ::std::sync::Arc;
+use ::std::sync::Mutex;
 use itertools::Itertools;
 use rand::Rng;
+use std::collections::HashMap;
 use std::error::Error;
-use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::mpsc;
-use std::thread;
 
 /* A set is 3 indices in the hand */
 #[derive(Clone, Copy, Debug)]
@@ -24,12 +24,12 @@ struct Set {
 
 impl Set {
     /* Checks if a set shares cards with another set */
-    fn no_share(self, other: &Self) -> bool {
+    fn no_share(self, other: Self) -> bool {
         if let Some(_) = self.indices.iter().find(|&&x| {
             if let Some(_) = other
                 .indices
                 .iter()
-                .find(|&&y| self.indices[x] == other.indices[y])
+                .find(|&&y| x == y)
             {
                 true
             } else {
@@ -45,7 +45,7 @@ impl Set {
      * known sets that have indices that come after the cards that
      * are being removed must be decremented so they are still valid.
      */
-    fn shift(&mut self, other: &Self) {
+    fn shift(&mut self, other: Self) {
         /* determines how much and which indices need changing */
         let shift: Vec<usize> = self
             .indices
@@ -106,7 +106,7 @@ impl Hand {
     }
 
     /* finds all the sets in the hand that contain any of the new cards */
-    fn find_sets(&mut self, deck_len: usize) -> Info {
+    fn find_and_rm(&mut self, deck_len: usize) -> Info {
         let len = self.cards.len();
         let split = len - 3; //the divider between old and new cards
 
@@ -146,24 +146,39 @@ impl Hand {
             });
         }
 
+        let set_count = self.sets.len();
+        let unique_count = self
+            .sets
+            .iter()
+            .flat_map(|x| x.indices.iter())
+            .unique()
+            .count();
+
+        /* if sets were found then choose a random set and remove it */
+        if set_count > 0 {
+            self.rm_set();
+        }
+
         Info {
             /* TODO: change this from clone to catagorizing of some type.
              * currently needless information is logged and program consumes
              * insane memory very quickly
              */
-            sets: self.sets.clone(),
-
+            sets: set_count,
             hand_size: len,
             deals: deals,
+            unique: unique_count,
         }
     }
 
-    fn rm_set(&mut self, to_rm: &Set) {
+    fn rm_set(&mut self) {
+        let to_rm = self.sets[rand::thread_rng().gen_range(0, self.sets.len())];
+        let (x, y, z) = (to_rm.indices[0], to_rm.indices[1], to_rm.indices[2]);
         self.sets.retain(|x| x.no_share(to_rm));
         for set in &mut self.sets {
             set.shift(to_rm);
         }
-        let mut a = [to_rm.indices[0], to_rm.indices[1], to_rm.indices[2]];
+        let mut a = [x, y, z];
         a.sort();
         self.cards.remove(a[2]);
         self.cards.remove(a[1]);
@@ -174,69 +189,45 @@ impl Hand {
 /* records info about a hand
  * TODO: change to catagorical type to reduce memory load
  */
-#[derive(Debug)]
+#[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
 pub struct Info {
-    sets: Vec<Set>,   //all of the found sets
+    sets: usize,      //number of sets in the hand
     hand_size: usize, //number of cards in the hand
     deals: usize,     //how many times cards have been removed from deck
-}
-
-impl Info {
-    /* serializes the info to be written to an external file
-     * TODO: will have to change with info rework
-     */
-    fn serde(&self) -> String {
-        let sets = itertools::join(
-            self.sets.iter().map(|x| {
-                x.indices[0].to_string()
-                    + " "
-                    + &x.indices[1].to_string()
-                    + " "
-                    + &x.indices[2].to_string()
-            }),
-            "|",
-        );
-
-        self.sets.len().to_string()
-            + ","
-            + &self.hand_size.to_string()
-            + ","
-            + &self.deals.to_string()
-            + ","
-            + &sets
-    }
+    unique: usize,    //the number of unique cards in the sets
 }
 
 /* plays an entire game of set and finds every set in every hand */
-pub fn play_game() -> Vec<Info> {
+pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
     let mut deck = deck::shuffle_cards();
     let mut hand = Hand::new(&mut deck);
     let mut data: Vec<Info> = Vec::with_capacity(30);
 
     loop {
-        let info = hand.find_sets(deck.len());
-        let sets = info.sets.len();
-
-        /* if sets were found then choose a random set and remove it */
-        if sets > 0 {
-            let to_rm = rand::thread_rng().gen_range(0, info.sets.len());
-            hand.rm_set(&info.sets[to_rm]);
-        }
+        let info = hand.find_and_rm(deck.len());
 
         data.push(info);
 
         /* condition where hand needs a deal */
-        if sets == 0 || hand.cards.len() < 12 {
+        if info.sets == 0 || hand.cards.len() < 12 {
             for _i in 0..3 {
                 match deck.pop() {
                     Some(x) => hand.cards.push(x),
-                    None => return data,
+                    None => {
+                        for key in data {
+                            let mut map = data_store.lock().unwrap();
+                            let count = map.entry(key).or_insert(0);
+                            *count += 1;
+                        }
+                        return;
+                    }
                 }
             }
         }
     }
 }
 
+/*
 /* exports data to the file. experimenting with channels to achieve concurrency.
  * channel does not seem to be the bottleneck of the program.
  */
@@ -293,35 +284,18 @@ pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<bool>>,
         }
     }
 }
+*/
 
 /* runs the simulation */
 pub fn run(games: i64) {
     /* number of threads playing set games */
     let workers = 4;
 
-    let (tx, rx) = mpsc::channel();
+    let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
+    let pool = ThreadPool::new(workers);
 
-    /* clone the transmitter for each worker */
-    let txs = (0..workers)
-        .map(|_| mpsc::Sender::clone(&tx))
-        .collect::<Vec<mpsc::Sender<Vec<Info>>>>();
-
-    /* create a way to shut down each thread */
-    let (kill_txs, kill_rxs): (Vec<mpsc::Sender<bool>>, Vec<mpsc::Receiver<bool>>) =
-        (0..workers).map(|_| &mpsc::channel()).unzip();
-
-    /* spawn the worker threads */
-    for i in 0..workers {
-        thread::spawn(move || loop {
-            txs[i].send(play_game());
-            match kill_rxs[i].try_recv() {
-                Ok(_) => break,
-                Err(_) => (),
-            }
-        });
+    for _ in 0..games {
+        let safe_map = data.clone();
+        pool.execute(move || play_game(safe_map));
     }
-
-    /* create a thread to do the exporting. */
-    let writer = thread::spawn(move || write_out(rx, kill_txs, games));
-    writer.join().unwrap();
 }

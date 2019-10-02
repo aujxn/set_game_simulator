@@ -21,9 +21,13 @@ fn main() {
     /* CLI configuration and parsing */
     let yml = load_yaml!("cli.yml");
     let args = App::from_yaml(yml).get_matches();
-    match args.subcommmand() {
-        Some("rmfirst", Some(games)) => rm_first_set::run(games.parse().unwrap()),
-        Some("findall", Some(games)) => find_all_sets::run(games.parse().unwrap()),
-        None => unreachable!(), //clap app settings displays usage if no subcommand is provided
+    match args.subcommand() {
+        ("rmfirst", Some(arg_matches)) => {
+            rm_first_set::run(arg_matches.value_of("games").unwrap().parse().unwrap())
+        }
+        ("findall", Some(arg_matches)) => {
+            find_all_sets::run(arg_matches.value_of("games").unwrap().parse().unwrap())
+        }
+        _ => unreachable!(), //clap app settings displays usage if no subcommand is provided
     }
 }
