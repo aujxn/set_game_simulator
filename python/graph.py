@@ -12,29 +12,39 @@ find_all_path = 'python/data/find_all/data.csv'
 rm_first_df = pd.read_csv(rm_first_path)
 find_all_df = pd.read_csv(find_all_path)
 
-scatter12 = px.scatter(df, x="deals", y="prob12")
-scatter15 = px.scatter(df, x="deals", y="prob15")
-scatter18 = px.scatter(df, x="deals", y="prob18")
+rm_first_df['prob12'] = rm_first_df.apply(lambda row: row.setless12 / (row.set12 + row.setless12), axis=1)
+rm_first_df['prob15'] = rm_first_df.apply(lambda row: row.setless15 / (row.set15 + row.setless15), axis=1)
+rm_first_df['prob18'] = rm_first_df.apply(lambda row: row.setless18 / (row.set18 + row.setless18), axis=1)
+
+scatter12 = px.scatter(rm_first_df, x="deals", y="prob12")
+scatter15 = px.scatter(rm_first_df, x="deals", y="prob15")
+scatter18 = px.scatter(rm_first_df, x="deals", y="prob18")
 
 prob_all_18 = [0] * 24
 prob_all_15 = [0] * 24
 prob_all_12 = [0] * 24
 
 for step in range(24):
-    prob_all_18[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']!=0]['count'].sum()
+    setless18 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']==0]['count'].sum()
+    set18 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']!=0]['count'].sum()
+    prob_all_18[step] =  setless18 / (set18 + setless18)
 
 for step in range(24):
-    prob_all_15[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']!=0]['count'].sum()
+    setless15 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']==0]['count'].sum() 
+    set15 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']!=0]['count'].sum()
+    prob_all_15[step] = setless15 / (set15 + setless15)
 
 for step in range(24):
-    prob_all_12[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']!=0]['count'].sum()
+    setless12 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']==0]['count'].sum() 
+    set12 = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']!=0]['count'].sum()
+    prob_all_12[step] = setless12 / (set12 + setless12)
 
+deals = [i for i in range(24)]
 data_all = {'deals':deals, 'prob12': prob_all_12, 'prob15':prob_all_15, 'prob18':prob_all_18}
 df_all = pd.DataFrame(data_all)
 scatter_all_18 = px.scatter(df_all, x="deals", y="prob18")
 scatter_all_15 = px.scatter(df_all, x="deals", y="prob15")
 scatter_all_12 = px.scatter(df_all, x="deals", y="prob12")
-"""
 """
 total_sets = go.Figure()
 
@@ -89,7 +99,6 @@ df_all = pd.DataFrame(data_all)
 
 scatter15_all = px.scatter(df_all, x="deals", y="prob15")
 """
-"""
 app = dash.Dash(__name__)
 
 app.layout = html.Div(children=[
@@ -125,12 +134,13 @@ app.layout = html.Div(children=[
         figure=scatter_all_18
         ),
         
+"""
     dcc.Graph(
         id='total_sets',
         figure=total_sets
         )
+"""
     ])
 
 app.run_server(debug=True)
-"""
 

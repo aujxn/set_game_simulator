@@ -179,7 +179,7 @@ impl Hand {
 
 /* records info about a hand */
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
-pub struct Info {
+struct Info {
     sets: usize,      //number of sets in the hand
     hand_size: usize, //number of cards in the hand
     deals: usize,     //how many times cards have been removed from deck
@@ -199,7 +199,7 @@ impl Info {
 }
 
 /* plays an entire game of set and finds every set in every hand */
-pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
+fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
     let mut deck = deck::shuffle_cards();
     let mut hand = Hand::new(&mut deck);
     let mut data: Vec<Info> = Vec::with_capacity(30);
@@ -229,7 +229,7 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
 }
 
 /* exports data to the file */
-pub fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
+fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
     let map = data.lock().unwrap();
 
     /* Convert data to csv file */

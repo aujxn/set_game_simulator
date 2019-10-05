@@ -24,13 +24,13 @@ pub enum Message {
 }
 
 /* manages a thread in the pool */
-pub struct Worker {
+struct Worker {
     id: usize, //for debugging purposes
     thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
-    pub fn new(id: usize, rx: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
+    fn new(id: usize, rx: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
         let thread = thread::spawn(move || loop {
             let message = rx.lock().unwrap().recv().unwrap();
 

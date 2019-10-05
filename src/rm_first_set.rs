@@ -67,7 +67,7 @@ impl std::ops::Add for GameResult {
 }
 
 /* Reports findings of a single set in a hand */
-pub enum Set {
+enum Set {
     /* Set was found. Values are indices in hand of cards that complete a set */
     Found(usize, usize, usize),
     /* Set wasn't found */
