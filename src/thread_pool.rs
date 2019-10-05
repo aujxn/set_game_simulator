@@ -1,12 +1,14 @@
-use ::std::sync::mpsc;
-use ::std::sync::Arc;
-use ::std::sync::Mutex;
-use ::std::thread;
+use ::std::{
+    sync::{mpsc, Arc, Mutex},
+    thread,
+};
 
+/* provides a way to move a closure out of a smart pointer */
 pub trait FnBox {
     fn call_box(self: Box<Self>);
 }
 
+/* calls the closure in the smart pointer */
 impl<F: FnOnce()> FnBox for F {
     fn call_box(self: Box<F>) {
         (*self)()
@@ -15,13 +17,15 @@ impl<F: FnOnce()> FnBox for F {
 
 type Job = Box<dyn FnBox + Send + 'static>;
 
+/* wraps jobs for the thread pool to complete */
 pub enum Message {
     NewJob(Job),
     Kill,
 }
 
+/* manages a thread in the pool */
 pub struct Worker {
-    id: usize,
+    id: usize, //for debugging purposes
     thread: Option<thread::JoinHandle<()>>,
 }
 
@@ -41,23 +45,29 @@ impl Worker {
         });
 
         Worker {
-            id: id,
+            id,
             thread: Some(thread),
         }
     }
 }
 
+/* manages the workers of the pool */
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: mpsc::Sender<Message>,
 }
 
+/* when ThreadPool goes out of scope the creating thread
+ * now holds until all workers are completed
+ */
 impl Drop for ThreadPool {
     fn drop(&mut self) {
+        /* send kill messages */
         for _ in &mut self.workers {
             self.sender.send(Message::Kill).unwrap();
         }
 
+        /* hold until all workers are completed */
         for worker in &mut self.workers {
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
@@ -80,7 +90,7 @@ impl ThreadPool {
         }
 
         ThreadPool {
-            workers: workers,
+            workers,
             sender: tx,
         }
     }

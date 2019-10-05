@@ -42,9 +42,5 @@ pub fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
 
 /* Checks the states for a single characteristic of a card */
 fn check(first: State, second: State, third: State) -> bool {
-    if (first as i32 + second as i32 + third as i32) % 3 == 0 {
-        true
-    } else {
-        false
-    }
+    (first as i32 + second as i32 + third as i32) % 3 == 0
 }

@@ -8,11 +8,7 @@
 use crate::{deck, set, set::Card};
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::error::Error;
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
+use std::{error::Error, fs, fs::File, io::prelude::*, path::Path};
 
 /* Reports how many of each hand were encountered in what
  * part of the game. GameResult is a 3 dimensional array.
@@ -178,9 +174,9 @@ fn play_game() -> GameResult {
                 remove.sort();
 
                 /* remove the cards from the hand that made a set */
-                hand.swap_remove(remove[2]);
-                hand.swap_remove(remove[1]);
-                hand.swap_remove(remove[0]);
+                (0..3).rev().for_each(|i| {
+                    hand.swap_remove(remove[i]);
+                });
 
                 /* search for the next set in all the cards */
                 set = find_set_all(&hand);
@@ -193,7 +189,7 @@ fn play_game() -> GameResult {
                     18 => result.data[deals][SIZE18][SETLESS] += 1,
                     _ => {
                         log::info!("Unreachable hand size: {:?}", hand.len());
-                        unreachable!();
+                        unreachable!(); //21 card hands always have sets
                     }
                 }
 
@@ -226,8 +222,8 @@ pub fn run(games: i64) {
          * iterator into the pieces that were distributed over threads. This is why reduce is
          * required to get the final sum.
          */
-        .fold(|| GameResult::default(), |acc, _| acc + play_game())
-        .reduce(|| GameResult::default(), |acc, x| acc + x);
+        .fold(GameResult::default, |acc, _| acc + play_game())
+        .reduce(GameResult::default, |acc, x| acc + x);
 
     let results = old + new;
 
@@ -240,19 +236,12 @@ pub fn run(games: i64) {
 fn report(results: &GameResult, games: i64) {
     log::info!("After {:?} games of simulated... \n\n", games);
 
-    /*
-    let data = results
-        .data
-        .iter()
-        .map(|x| [x[SETS].iter().sum(), x[SETLESS].iter().sum()])
-        .collect::<Vec<[i64; 2]>>();
-    */
-
     let mut data = [[0; 2]; 3];
 
-    for i in 0..24 {
-        for j in 0..3 {
-            for k in 0..2 {
+    /* add up the results into general stats */
+    for (i, _) in results.data.iter().enumerate() {
+        for (j, _) in results.data[i].iter().enumerate() {
+            for (k, _) in results.data[i][j].iter().enumerate() {
                 data[j][k] += results.data[i][j][k];
             }
         }
@@ -298,6 +287,7 @@ fn load() -> GameResult {
 
     let mut old = GameResult::default();
 
+    /* index values for the csv records */
     const DEALS: usize = 0;
     const SETLESS12: usize = 1;
     const SET12: usize = 2;
@@ -306,6 +296,7 @@ fn load() -> GameResult {
     const SETLESS18: usize = 5;
     const SET18: usize = 6;
 
+    /* read each value into memory from csv */
     for result in rdr.records() {
         let record = result.unwrap();
         let deals: usize = record[DEALS].parse().unwrap();

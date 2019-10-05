@@ -10,14 +10,10 @@ use crate::{deck, set, set::Card, thread_pool::ThreadPool};
 use csv;
 use itertools::Itertools;
 use rand::Rng;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::{
+    collections::HashMap, error::Error, fs, fs::File, io::prelude::*, path::Path, sync::Arc,
+    sync::Mutex,
+};
 
 /* A set is 3 indices in the hand */
 #[derive(Clone, Copy, Debug)]
@@ -26,20 +22,6 @@ struct Set {
 }
 
 impl Set {
-    /* Checks if a set shares cards with another set */
-    fn no_share(self, other: Self) -> bool {
-        if let Some(_) = self.indices.iter().find(|&&x| {
-            if let Some(_) = other.indices.iter().find(|&&y| x == y) {
-                true
-            } else {
-                false
-            }
-        }) {
-            return false;
-        }
-        true
-    }
-
     /* other is being removed from the hand.
      * known sets that have indices that come after the cards that
      * are being removed must be decremented so they are still valid.
@@ -106,14 +88,14 @@ impl Hand {
 
     /* finds all the sets in the hand that contain any of the new cards */
     fn find_and_rm(&mut self, deck_len: usize) -> Info {
-        let len = self.cards.len();
-        let split = len - 3; //the divider between old and new cards
+        let hand_size = self.cards.len();
+        let split = hand_size - 3; //the divider between old and new cards
 
         /* calculates how many times cards have been removed from the deck */
         let deals = 23 - (deck_len / 3);
 
         /* searches for sets that have one of the new cards */
-        for x in split..len {
+        for x in split..hand_size {
             self.sets.append(
                 &mut (0..split)
                     .tuple_combinations()
@@ -126,7 +108,7 @@ impl Hand {
         /* searches for sets that have two of the new cards */
         for x in 0..split {
             self.sets.append(
-                &mut (split..len)
+                &mut (split..hand_size)
                     .tuple_combinations()
                     .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
                     .map(|(y, z)| Set { indices: [x, y, z] })
@@ -145,8 +127,10 @@ impl Hand {
             });
         }
 
-        let set_count = self.sets.len();
-        let unique_count = self
+        let sets = self.sets.len();
+
+        /* counts number of unique cards in list of sets */
+        let unique = self
             .sets
             .iter()
             .flat_map(|x| x.indices.iter())
@@ -154,30 +138,42 @@ impl Hand {
             .count();
 
         /* if sets were found then choose a random set and remove it */
-        if set_count > 0 {
+        if sets > 0 {
             self.rm_set();
         }
 
         Info {
-            sets: set_count,
-            hand_size: len,
-            deals: deals,
-            unique: unique_count,
+            sets,
+            hand_size,
+            deals,
+            unique,
         }
     }
 
+    /* removes a set from the list of sets */
     fn rm_set(&mut self) {
+        /* pick a random set and destructor indices */
         let to_rm = self.sets[rand::thread_rng().gen_range(0, self.sets.len())];
         let (x, y, z) = (to_rm.indices[0], to_rm.indices[1], to_rm.indices[2]);
-        self.sets.retain(|x| x.no_share(to_rm));
+
+        /* remove all sets that share cards with set to remove */
+        self.sets.retain(|set| {
+            !set.indices
+                .iter()
+                .any(|&x| to_rm.indices.iter().any(|&y| x == y))
+        });
+
+        /* shift indices to correct for removal */
         for set in &mut self.sets {
             set.shift(to_rm);
         }
+
+        /* remove in reverse to keep indices consistent */
         let mut a = [x, y, z];
         a.sort();
-        self.cards.remove(a[2]);
-        self.cards.remove(a[1]);
-        self.cards.remove(a[0]);
+        a.iter().rev().for_each(|i| {
+            self.cards.remove(*i);
+        });
     }
 }
 
@@ -210,7 +206,6 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
 
     loop {
         let info = hand.find_and_rm(deck.len());
-
         data.push(info);
 
         /* condition where hand needs a deal */
@@ -219,8 +214,9 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
                 match deck.pop() {
                     Some(x) => hand.cards.push(x),
                     None => {
+                        /* when no cards remain add all the data to the map */
+                        let mut map = data_store.lock().unwrap();
                         for key in data {
-                            let mut map = data_store.lock().unwrap();
                             let count = map.entry(key).or_insert(0);
                             *count += 1;
                         }
@@ -235,20 +231,14 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
 /* exports data to the file */
 pub fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
     let map = data.lock().unwrap();
+
+    /* Convert data to csv file */
     let serialized = String::from("sets,hand_size,deals,unique,count\n")
         + &itertools::join(
             map.iter()
                 .map(|(info, count)| info.serialize() + "," + &count.to_string()),
             "\n",
         );
-
-    /*
-    /* Create the output filename using the current date/time */
-    let date: DateTime<Local> = Local::now();
-    let path_name = "python/data/find_all/".to_string()
-        + &date.format("%Y-%m-%d_%H:%M:%S").to_string()
-        + ".txt";
-    */
 
     /* Create the path to write file to */
     let path = Path::new("python/data/find_all/data.csv");
