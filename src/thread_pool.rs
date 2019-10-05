@@ -54,13 +54,11 @@ pub struct ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-
         for _ in &mut self.workers {
             self.sender.send(Message::Kill).unwrap();
         }
 
         for worker in &mut self.workers {
-
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();
             }

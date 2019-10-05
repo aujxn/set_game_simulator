@@ -5,61 +5,77 @@
  * data is then written to an external file.
  */
 
-use crate::{
-    deck, set,
-    set::{Card, Set},
-};
+use crate::{deck, set, set::Card};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::error::Error;
-use std::io::prelude::*;
+use std::fs;
 use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
-use chrono::prelude::*;
 
-/* Reports how many of each hand were encountered in what part of the game
- * See default implementation for description
+/* Reports how many of each hand were encountered in what
+ * part of the game. GameResult is a 3 dimensional array.
+ *
+ * The first dimension is representive of the game progress.
+ * The index of this dimension is the number of times cards
+ * have been dealt. The game starts at 0 deals (the initial
+ * 12 card hand) and the last hand is played after the 23rd
+ * deal.
+ *
+ * The second dimension is the hand size. Index 0 is 12
+ * cards, 1 is 15 cards, and 2 is 18 cards.
+ *
+ * The third dimension is the sets vs setless counts. Index
+ * 0 is the count of hands with sets and index 1 in setless.
+ *
+ * example: if 2500 is at index [9][1][1] then 2500
+ * hands after 9 deals with 15 cards were found with no sets
  */
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct GameResult {
-    sets: Vec<Vec<i64>>,
-    setless: Vec<Vec<i64>>,
+    data: [[[i64; 2]; 3]; 24],
 }
 
-/* The sets vector contain 4 vectors. Index 0 to 3 have data for 12, 15, 18, and 21
- * card hands respectively. The index of these 4 vectors represents the number of times
- * cards have been dealt from the deck. The setless vector is the same, except without
- * a vector for 21 card hands. This is because a 21 card hand must contain a set.
- */
+/* default is all 0 values */
 impl Default for GameResult {
     fn default() -> Self {
         GameResult {
-            sets: vec![vec![0; 24], vec![0; 24], vec![0; 24], vec![0; 24]],
-            setless: vec![vec![0; 24], vec![0; 24], vec![0; 24]],
+            data: [[[0; 2]; 3]; 24],
         }
     }
 }
 
-/* Simply combines GameResult values into a single result */
+/* Pretty indexing for GameResults */
+const SETS: usize = 0;
+const SETLESS: usize = 1;
+const SIZE12: usize = 0;
+const SIZE15: usize = 1;
+const SIZE18: usize = 2;
+
+/* Combines GameResult values into a single result */
 impl std::ops::Add for GameResult {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Self {
-            sets: self
-                .sets
-                .iter()
-                .zip(other.sets.iter())
-                .map(|x| x.0.iter().zip(x.1.iter()).map(|y| y.0 + y.1).collect())
-                .collect(),
-            setless: self
-                .setless
-                .iter()
-                .zip(other.setless.iter())
-                .map(|x| x.0.iter().zip(x.1.iter()).map(|y| y.0 + y.1).collect())
-                .collect(),
+        let mut sum = GameResult::default();
+        for i in 0..24 {
+            for j in 0..3 {
+                for k in 0..2 {
+                    sum.data[i][j][k] = self.data[i][j][k] + other.data[i][j][k];
+                }
+            }
         }
+        sum
     }
+}
+
+/* Reports findings of a single set in a hand */
+pub enum Set {
+    /* Set was found. Values are indices in hand of cards that complete a set */
+    Found(usize, usize, usize),
+    /* Set wasn't found */
+    NotFound(),
 }
 
 /* Searches entire hand for sets */
@@ -132,13 +148,14 @@ fn play_game() -> GameResult {
 
     /* This is the loop that plays one entire game of set. */
     loop {
+        /* number of times cards have been dealt */
+        let deals = 23 - (deck.len() / 3);
         match set {
             Set::Found(x, y, z) => {
                 /* Add to the count that a set was found */
                 match hand.len() {
                     12 => {
-                        /* 23 - (deck.len() / 3) calculates how many times cards have been dealt */
-                        result.sets[0][23 - (deck.len() / 3)] += 1;
+                        result.data[deals][SIZE12][SETS] += 1;
                         /* If the deck has 12 cards add 3 cards to the hand */
                         for _i in 0..3 {
                             match deck.pop() {
@@ -147,11 +164,11 @@ fn play_game() -> GameResult {
                             }
                         }
                     }
-                    15 => result.sets[1][23 - (deck.len() / 3)] += 1,
-                    18 => result.sets[2][23 - (deck.len() / 3)] += 1,
-                    21 => result.sets[3][23 - (deck.len() / 3)] += 1,
+                    15 => result.data[deals][SIZE15][SETS] += 1,
+                    18 => result.data[deals][SIZE18][SETS] += 1,
+                    21 => (),
                     _ => {
-                        println!("Unreachable hand size: {:?}", hand.len());
+                        log::info!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
                     }
                 }
@@ -171,11 +188,11 @@ fn play_game() -> GameResult {
             Set::NotFound() => {
                 /* update the count of hand with no sets */
                 match hand.len() {
-                    12 => result.setless[0][23 - (deck.len() / 3)] += 1,
-                    15 => result.setless[1][23 - (deck.len() / 3)] += 1,
-                    18 => result.setless[2][23 - (deck.len() / 3)] += 1,
+                    12 => result.data[deals][SIZE12][SETLESS] += 1,
+                    15 => result.data[deals][SIZE15][SETLESS] += 1,
+                    18 => result.data[deals][SIZE18][SETLESS] += 1,
                     _ => {
-                        println!("Unreachable hand size: {:?}", hand.len());
+                        log::info!("Unreachable hand size: {:?}", hand.len());
                         unreachable!();
                     }
                 }
@@ -196,8 +213,11 @@ fn play_game() -> GameResult {
 }
 
 pub fn run(games: i64) {
+    /* loads in data from previous executions */
+    let old = load();
+
     /* plays the game and sums all the results in parallel */
-    let results: GameResult = (0..games)
+    let new: GameResult = (0..games)
         .into_par_iter()
         /* The reason fold and reduce are needed here is because of the way Rayon's parallel
          * iterator works. Fold allows the identity function (its first argument) to return a type
@@ -209,8 +229,10 @@ pub fn run(games: i64) {
         .fold(|| GameResult::default(), |acc, _| acc + play_game())
         .reduce(|| GameResult::default(), |acc, x| acc + x);
 
+    let results = old + new;
+
     /* Finalize */
-    report(&results, games);
+    report(&new, games);
     write_results(&results);
 }
 
@@ -218,77 +240,113 @@ pub fn run(games: i64) {
 fn report(results: &GameResult, games: i64) {
     log::info!("After {:?} games of simulated... \n\n", games);
 
-    let setless = results
-        .setless
+    /*
+    let data = results
+        .data
         .iter()
-        .map(|x| x.iter().sum())
-        .collect::<Vec<i64>>();
-    let sets = results
-        .sets
-        .iter()
-        .map(|x| x.iter().sum())
-        .collect::<Vec<i64>>();
+        .map(|x| [x[SETS].iter().sum(), x[SETLESS].iter().sum()])
+        .collect::<Vec<[i64; 2]>>();
+    */
 
-    log::info!("12 card hands with no sets: {:?}", setless[0]);
-    log::info!("12 card hands where set was found: {:?}", sets[0]);
+    let mut data = [[0; 2]; 3];
+
+    for i in 0..24 {
+        for j in 0..3 {
+            for k in 0..2 {
+                data[j][k] += results.data[i][j][k];
+            }
+        }
+    }
+
+    log::info!("12 card hands with no sets: {:?}", data[SIZE12][SETLESS]);
+    log::info!(
+        "12 card hands where set was found: {:?}",
+        data[SIZE12][SETS]
+    );
     log::info!(
         "proportion of 12s w/out sets: {:.3}%\n",
-        100.0 * setless[0] as f64 / sets[0] as f64
+        100.0 * data[SIZE12][SETLESS] as f64 / data[SIZE12][SETS] as f64
     );
 
-    log::info!("15 card hands with no sets: {:?}", setless[1]);
-    log::info!("15 card hands where set was found: {:?}", sets[1]);
+    log::info!("15 card hands with no sets: {:?}", data[SIZE15][SETLESS]);
+    log::info!(
+        "15 card hands where set was found: {:?}",
+        data[SIZE15][SETS]
+    );
     log::info!(
         "proportion of 15s w/out sets: {:.3}%\n",
-        100.0 * setless[1] as f64 / sets[1] as f64
+        100.0 * data[SIZE15][SETLESS] as f64 / data[SIZE15][SETS] as f64
     );
 
-    log::info!("18 card hands with no sets: {:?}", setless[2]);
-    log::info!("18 card hands where set was found: {:?}", sets[2]);
+    log::info!("18 card hands with no sets: {:?}", data[SIZE18][SETLESS]);
+    log::info!(
+        "18 card hands where set was found: {:?}",
+        data[SIZE18][SETS]
+    );
     log::info!(
         "proportion of 18s w/out sets: {:.3}%\n",
-        100.0 * setless[2] as f64 / sets[2] as f64
+        100.0 * data[SIZE18][SETLESS] as f64 / data[SIZE18][SETS] as f64
     );
+}
 
-    log::info!(
-        "21 cards hands encountered: {:?}\n ({:?} games per 21 card hand)",
-        sets[3],
-        if sets[3] != 0 {
-            games as i64 / sets[3]
-        } else {
-            0
-        }
-    );
+/* Loads data from previous executions into memory */
+fn load() -> GameResult {
+    let path = Path::new("python/data/rm_first/data.csv");
+    let contents = fs::read_to_string(path).unwrap();
+
+    let mut rdr = csv::Reader::from_reader(contents.as_bytes());
+
+    let mut old = GameResult::default();
+
+    const DEALS: usize = 0;
+    const SETLESS12: usize = 1;
+    const SET12: usize = 2;
+    const SETLESS15: usize = 3;
+    const SET15: usize = 4;
+    const SETLESS18: usize = 5;
+    const SET18: usize = 6;
+
+    for result in rdr.records() {
+        let record = result.unwrap();
+        let deals: usize = record[DEALS].parse().unwrap();
+        old.data[deals][SIZE12][SETS] = record[SET12].parse().unwrap();
+        old.data[deals][SIZE12][SETLESS] = record[SETLESS12].parse().unwrap();
+        old.data[deals][SIZE15][SETS] = record[SET15].parse().unwrap();
+        old.data[deals][SIZE15][SETLESS] = record[SETLESS15].parse().unwrap();
+        old.data[deals][SIZE18][SETS] = record[SET18].parse().unwrap();
+        old.data[deals][SIZE18][SETLESS] = record[SETLESS18].parse().unwrap();
+    }
+    old
 }
 
 /* Exports results to an external data file */
 fn write_results(results: &GameResult) {
     /* Serialize the data into a string so it can be published to an external file */
-    let serialized: String = itertools::join(
-        results
-            .setless
-            .iter()
-            .map(|x| itertools::join(x, " "))
-            .collect::<Vec<String>>(),
-        "\n",
-    ) + "\n"
-        + &itertools::join(
-            results
-                .sets
-                .iter()
-                .map(|x| itertools::join(x, " "))
-                .collect::<Vec<String>>(),
-            "\n",
-        );
+    let serialized: String =
+        String::from("deals,setless12,set12,setless15,set15,setless18,set18\n")
+            + &itertools::join(
+                results
+                    .data
+                    .iter()
+                    .enumerate()
+                    .map(|(i, x)| {
+                        i.to_string()
+                            + ","
+                            + &itertools::join(
+                                x.iter()
+                                    .map(|y| y[SETLESS].to_string() + "," + &y[SETS].to_string()),
+                                ",",
+                            )
+                    })
+                    .collect::<Vec<String>>(),
+                "\n",
+            );
 
     /* Create the output filename using the current date/time */
-    let date: DateTime<Local> = Local::now();
-    let path_name = "python/data/rm_first/".to_string()
-        + &date.format("%Y-%m-%d_%H:%M:%S").to_string()
-        + ".txt";
+    let path_name = "python/data/rm_first/data.csv";
 
     /* Create the path to write file to */
-    let path = Path::new(&path_name);
+    let path = Path::new(path_name);
     let display = path.display();
 
     /* Make the file */

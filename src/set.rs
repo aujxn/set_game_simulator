@@ -26,14 +26,6 @@ impl State {
     }
 }
 
-/* Reports findings of a single set in a hand */
-pub enum Set {
-    /* Set was found. Values are indices in hand of cards that complete a set */
-    Found(usize, usize, usize),
-    /* Set wasn't found */
-    NotFound(),
-}
-
 /* Function to check if a trio of cards is a set. In the game of
  * set every card has 4 attributes with 3 states. 3 cards make a
  * set if for each attribute the cards are of the same state or all

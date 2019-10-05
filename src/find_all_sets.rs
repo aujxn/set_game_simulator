@@ -7,18 +7,17 @@
  */
 
 use crate::{deck, set, set::Card, thread_pool::ThreadPool};
-use std::sync::Arc;
-use std::sync::Mutex;
+use csv;
 use itertools::Itertools;
 use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fs;
+use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use std::fs::File;
-use std::fs;
-use chrono::prelude::*;
-use csv;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 /* A set is 3 indices in the hand */
 #[derive(Clone, Copy, Debug)]
@@ -30,11 +29,7 @@ impl Set {
     /* Checks if a set shares cards with another set */
     fn no_share(self, other: Self) -> bool {
         if let Some(_) = self.indices.iter().find(|&&x| {
-            if let Some(_) = other
-                .indices
-                .iter()
-                .find(|&&y| x == y)
-            {
+            if let Some(_) = other.indices.iter().find(|&&y| x == y) {
                 true
             } else {
                 false
@@ -197,7 +192,13 @@ pub struct Info {
 
 impl Info {
     fn serialize(&self) -> String {
-        self.sets.to_string() + "," + &self.hand_size.to_string() + "," + &self.deals.to_string() + "," + &self.unique.to_string()
+        self.sets.to_string()
+            + ","
+            + &self.hand_size.to_string()
+            + ","
+            + &self.deals.to_string()
+            + ","
+            + &self.unique.to_string()
     }
 }
 
@@ -234,7 +235,12 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
 /* exports data to the file */
 pub fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
     let map = data.lock().unwrap();
-    let serialized = String::from("sets,hand_size,deals,unique,count\n") + &itertools::join(map.iter().map(|(info, count)| info.serialize() + "," + &count.to_string()), "\n");
+    let serialized = String::from("sets,hand_size,deals,unique,count\n")
+        + &itertools::join(
+            map.iter()
+                .map(|(info, count)| info.serialize() + "," + &count.to_string()),
+            "\n",
+        );
 
     /*
     /* Create the output filename using the current date/time */
@@ -274,7 +280,7 @@ fn load(data: &Arc<Mutex<HashMap<Info, i64>>>) {
             sets: record[0].parse().unwrap(),
             hand_size: record[1].parse().unwrap(),
             deals: record[2].parse().unwrap(),
-            unique: record[3].parse().unwrap()
+            unique: record[3].parse().unwrap(),
         };
         let count: i64 = record[4].parse().unwrap();
 
@@ -293,9 +299,9 @@ pub fn run(games: i64) {
     let chunk_size = 1000;
     let chunks = games / chunk_size;
 
-    /* thread shared hash table to store the game results in */
+    /* concurrent safe hash table to store the game result info in */
     let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
-    
+
     /* loads a file with existing data into memory */
     load(&data);
 

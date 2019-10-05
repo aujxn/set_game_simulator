@@ -6,70 +6,15 @@ import dash_core_components as dcc
 import dash_html_components as html
 import os
 
-def parseline(line, data):
-    i = 0;
-    for a in line.split(' '):
-        try:
-            data[i] += int(a)
-            i += 1
-        except ValueError:
-            pass
+rm_first_path = 'python/data/rm_first/data.csv'
+find_all_path = 'python/data/find_all/data.csv'
 
-def calcProb(setless, with_sets):
-    prob = []
-    for i in range(len(setless)):
-        if with_sets[i] == 0:
-            prob.append(0)
-        else:
-            prob.append(float(setless[i]) / float(with_sets[i]))
-    return prob
-
-deals = [i for i in range(24)]
-
-set12 = [0]*24
-set15 = [0]*24
-set18 = [0]*24
-
-setless12 = [0]*24
-setless15 = [0]*24
-setless18 = [0]*24
-
-path = 'python/data/rm_first/'
-
-for filename in os.listdir(path):
-
-    f=open(path + filename)
-
-    data = []
-    lines = f.readlines()
-    for x in lines:
-        data.append(x)
-
-    parseline(data[0], setless12)
-    parseline(data[1], setless15)
-    parseline(data[2], setless18)
-    parseline(data[3], set12)
-    parseline(data[4], set15)
-    parseline(data[5], set18)
-
-f = open(path+"data.csv", "w+")
-f.write("deals,setless12,set12,setless15,set15,setless18,set18\n")
-for i in range(24):
-    f.write(str(i) + ',' + str(setless12[i]) + ',' + str(set12[i]) + ',' + str(setless15[i]) + ',' + str(set15[i]) + ',' + str(setless18[i]) + ',' + str(set18[i]) + '\n')
-"""
-prob12 = calcProb(setless12, set12)
-prob15 = calcProb(setless15, set15)
-prob18 = calcProb(setless18, set18)
-
-data = {'deals':deals, 'prob12':prob12, 'prob15':prob15, 'prob18':prob18}
-df = pd.DataFrame(data)
+rm_first_df = pd.read_csv(rm_first_path)
+find_all_df = pd.read_csv(find_all_path)
 
 scatter12 = px.scatter(df, x="deals", y="prob12")
 scatter15 = px.scatter(df, x="deals", y="prob15")
 scatter18 = px.scatter(df, x="deals", y="prob18")
-
-find_all_df = pd.read_csv("python/data/find_all/data.csv")
-
 
 prob_all_18 = [0] * 24
 prob_all_15 = [0] * 24
