@@ -7,10 +7,10 @@
 /* CLI crate macros */
 #[macro_use]
 extern crate clap;
-extern crate set_simulator;
-
-pub use crate::set_simulator::{find_all_sets, rm_first_set};
 use clap::App;
+
+extern crate set_simulator;
+pub use crate::set_simulator::{find_all_sets, rm_first_set};
 
 fn main() {
     /* Initialization */

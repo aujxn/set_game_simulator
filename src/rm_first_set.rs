@@ -9,13 +9,13 @@ use crate::{
     deck, set,
     set::{Card, Set},
 };
-use chrono::prelude::*;
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::error::Error;
-use std::fs::File;
 use std::io::prelude::*;
+use std::fs::File;
 use std::path::Path;
+use chrono::prelude::*;
 
 /* Reports how many of each hand were encountered in what part of the game
  * See default implementation for description

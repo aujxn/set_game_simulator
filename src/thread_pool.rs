@@ -32,12 +32,9 @@ impl Worker {
 
             match message {
                 Message::NewJob(job) => {
-                    println!("worker {:?} got job", id);
-
                     job.call_box();
                 }
                 Message::Kill => {
-                    println!("killing worker {:?}", id);
                     break;
                 }
             }
@@ -57,14 +54,12 @@ pub struct ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        println!("killing workers...");
 
         for _ in &mut self.workers {
             self.sender.send(Message::Kill).unwrap();
         }
 
         for worker in &mut self.workers {
-            println!("shutting down worker {}", worker.id);
 
             if let Some(thread) = worker.thread.take() {
                 thread.join().unwrap();

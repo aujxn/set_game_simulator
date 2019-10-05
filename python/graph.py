@@ -38,7 +38,6 @@ path = 'python/data/rm_first/'
 
 for filename in os.listdir(path):
 
-    print(filename)
     f=open(path + filename)
 
     data = []
@@ -53,6 +52,11 @@ for filename in os.listdir(path):
     parseline(data[4], set15)
     parseline(data[5], set18)
 
+f = open(path+"data.csv", "w+")
+f.write("deals,setless12,set12,setless15,set15,setless18,set18\n")
+for i in range(24):
+    f.write(str(i) + ',' + str(setless12[i]) + ',' + str(set12[i]) + ',' + str(setless15[i]) + ',' + str(set15[i]) + ',' + str(setless18[i]) + ',' + str(set18[i]) + '\n')
+"""
 prob12 = calcProb(setless12, set12)
 prob15 = calcProb(setless15, set15)
 prob18 = calcProb(setless18, set18)
@@ -66,6 +70,27 @@ scatter18 = px.scatter(df, x="deals", y="prob18")
 
 find_all_df = pd.read_csv("python/data/find_all/data.csv")
 
+
+prob_all_18 = [0] * 24
+prob_all_15 = [0] * 24
+prob_all_12 = [0] * 24
+
+for step in range(24):
+    prob_all_18[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==18].loc[find_all_df['sets']!=0]['count'].sum()
+
+for step in range(24):
+    prob_all_15[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==15].loc[find_all_df['sets']!=0]['count'].sum()
+
+for step in range(24):
+    prob_all_12[step] = find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']==0]['count'].sum() / find_all_df.loc[find_all_df['deals']==step].loc[find_all_df['hand_size']==12].loc[find_all_df['sets']!=0]['count'].sum()
+
+data_all = {'deals':deals, 'prob12': prob_all_12, 'prob15':prob_all_15, 'prob18':prob_all_18}
+df_all = pd.DataFrame(data_all)
+scatter_all_18 = px.scatter(df_all, x="deals", y="prob18")
+scatter_all_15 = px.scatter(df_all, x="deals", y="prob15")
+scatter_all_12 = px.scatter(df_all, x="deals", y="prob12")
+"""
+"""
 total_sets = go.Figure()
 
 for step in range(23):
@@ -118,7 +143,8 @@ data_all = {'deals':newdeal, 'prob15':prob15all}
 df_all = pd.DataFrame(data_all)
 
 scatter15_all = px.scatter(df_all, x="deals", y="prob15")
-
+"""
+"""
 app = dash.Dash(__name__)
 
 app.layout = html.Div(children=[
@@ -130,13 +156,18 @@ app.layout = html.Div(children=[
         ),
 
     dcc.Graph(
+        id='12_all',
+        figure=scatter_all_12
+        ),
+
+    dcc.Graph(
         id='15',
         figure=scatter15
         ),
 
     dcc.Graph(
         id='15_all',
-        figure=scatter15_all
+        figure=scatter_all_15
         ),
 
     dcc.Graph(
@@ -145,9 +176,16 @@ app.layout = html.Div(children=[
         ),
 
     dcc.Graph(
+        id='18_all',
+        figure=scatter_all_18
+        ),
+        
+    dcc.Graph(
         id='total_sets',
         figure=total_sets
         )
     ])
 
 app.run_server(debug=True)
+"""
+

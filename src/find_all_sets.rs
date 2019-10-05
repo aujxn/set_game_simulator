@@ -7,14 +7,18 @@
  */
 
 use crate::{deck, set, set::Card, thread_pool::ThreadPool};
-use ::std::sync::Arc;
-use ::std::sync::Mutex;
+use std::sync::Arc;
+use std::sync::Mutex;
 use itertools::Itertools;
 use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::prelude::*;
 use std::path::Path;
+use std::fs::File;
+use std::fs;
+use chrono::prelude::*;
+use csv;
 
 /* A set is 3 indices in the hand */
 #[derive(Clone, Copy, Debug)]
@@ -160,10 +164,6 @@ impl Hand {
         }
 
         Info {
-            /* TODO: change this from clone to catagorizing of some type.
-             * currently needless information is logged and program consumes
-             * insane memory very quickly
-             */
             sets: set_count,
             hand_size: len,
             deals: deals,
@@ -186,15 +186,19 @@ impl Hand {
     }
 }
 
-/* records info about a hand
- * TODO: change to catagorical type to reduce memory load
- */
+/* records info about a hand */
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
 pub struct Info {
     sets: usize,      //number of sets in the hand
     hand_size: usize, //number of cards in the hand
     deals: usize,     //how many times cards have been removed from deck
     unique: usize,    //the number of unique cards in the sets
+}
+
+impl Info {
+    fn serialize(&self) -> String {
+        self.sets.to_string() + "," + &self.hand_size.to_string() + "," + &self.deals.to_string() + "," + &self.unique.to_string()
+    }
 }
 
 /* plays an entire game of set and finds every set in every hand */
@@ -227,75 +231,82 @@ pub fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
     }
 }
 
-/*
-/* exports data to the file. experimenting with channels to achieve concurrency.
- * channel does not seem to be the bottleneck of the program.
- */
-pub fn write_out(info: mpsc::Receiver<Vec<Info>>, kill: Vec<mpsc::Sender<bool>>, games: i64) {
-    let path_name = "python/data/find_all/data.csv";
+/* exports data to the file */
+pub fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
+    let map = data.lock().unwrap();
+    let serialized = String::from("sets,hand_size,deals,unique,count\n") + &itertools::join(map.iter().map(|(info, count)| info.serialize() + "," + &count.to_string()), "\n");
+
+    /*
+    /* Create the output filename using the current date/time */
+    let date: DateTime<Local> = Local::now();
+    let path_name = "python/data/find_all/".to_string()
+        + &date.format("%Y-%m-%d_%H:%M:%S").to_string()
+        + ".txt";
+    */
 
     /* Create the path to write file to */
-    let path = Path::new(path_name);
+    let path = Path::new("python/data/find_all/data.csv");
     let display = path.display();
 
     /* Make the file */
-    let mut file = match OpenOptions::new().append(true).create(true).open(path) {
+    let mut file = match File::create(&path) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
         Ok(file) => file,
     };
 
-    /* counts games played */
-    let mut counter = 0;
-    loop {
-        match info.recv() {
-            Ok(data) => {
-                let serialized: String = itertools::join(
-                    data.iter().map(|x| x.serde()).collect::<Vec<String>>(),
-                    "\n",
-                ) + "\n";
-                /* Write the data to the file */
-                /* TODO: change to a buffer instead of doing millions of writes */
-                match file.write_all(serialized.as_bytes()) {
-                    Err(why) => panic!("couldn't create {}: {}", display, why.description()),
-                    Ok(_) => (),
-                }
-                counter += 1;
-            }
-            Err(_) => (),
-        }
-
-        /* games played reaches games desired so kill the loop */
-        if counter == games {
-            break;
-        }
-    }
-
-    /* kill all the worker (simulation) threads */
-    /* TODO: ask someone who knows things if this is a sensible way to handle concurrency */
-    for rx in kill {
-        /* i don't care if this succeeds/fails because my work is all done
-         * and im just trying to shut down nicely.
-         * and i just want rust to be happy.
-         * this doesn't seem very "correct"
-         */
-        match rx.send(true) {
-            Err(_) => (),
-            Ok(_) => (),
-        }
+    /* Write the data to the file */
+    match file.write_all(serialized.as_bytes()) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(_) => log::info!("wrote data to {}", display),
     }
 }
-*/
+
+/* loads in the data from previous executions */
+fn load(data: &Arc<Mutex<HashMap<Info, i64>>>) {
+    let path = Path::new("python/data/find_all/data.csv");
+    let contents = fs::read_to_string(path).unwrap();
+
+    let mut rdr = csv::Reader::from_reader(contents.as_bytes());
+
+    for result in rdr.records() {
+        let record = result.unwrap();
+        let info = Info {
+            sets: record[0].parse().unwrap(),
+            hand_size: record[1].parse().unwrap(),
+            deals: record[2].parse().unwrap(),
+            unique: record[3].parse().unwrap()
+        };
+        let count: i64 = record[4].parse().unwrap();
+
+        let mut map = data.lock().unwrap();
+        let val = map.entry(info).or_insert(0);
+        *val += count;
+    }
+}
 
 /* runs the simulation */
 pub fn run(games: i64) {
     /* number of threads playing set games */
     let workers = 4;
 
-    let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
-    let pool = ThreadPool::new(workers);
+    /* chunk the work so the work queue doesn't consume memory */
+    let chunk_size = 1000;
+    let chunks = games / chunk_size;
 
-    for _ in 0..games {
-        let safe_map = data.clone();
-        pool.execute(move || play_game(safe_map));
+    /* thread shared hash table to store the game results in */
+    let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
+    
+    /* loads a file with existing data into memory */
+    load(&data);
+
+    for _ in 0..chunks {
+        let pool = ThreadPool::new(workers);
+
+        for _ in 0..chunk_size {
+            let safe_map = data.clone();
+            pool.execute(move || play_game(safe_map));
+        }
     }
+
+    write_out(data);
 }
