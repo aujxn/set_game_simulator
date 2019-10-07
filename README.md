@@ -1,6 +1,7 @@
 # Set Simulator
 
-This program simulates Set games to count how often hands contain no sets.
+This program implements a Monte Carlo simulation for playing the game Set.
+The goal is to explore and understand probabilities of certain events in the game.
 
 The raw probability of a given hand containing no sets is quite low.
 Randomly selecting cards you get the following probability of containing sets:
@@ -34,12 +35,14 @@ cd set_game_simulator
 ```
 
 At this step you have enough to generate the raw data. To run the program you must have rustc or cargo installed.
-Replace <number_of_games> with how many games you would like to run. On my very old quad core AMD 1_000_000 games
-takes about 5 seconds. The program utilizes however many cores your machine has available using the Rayon crate.
-Make sure to include the release flag or it will take forever. The output data is exported to ./python/data.txt.
-The program must be run from the project root so it can find the output folder for the data.
+The program requires on of two subcommands --- rmfirst and findall. rmfirst removes the first set that is encountered
+and findall locates all the sets in the hand and removes one at random. Both these subcommands require a number of games
+argument.
+The program must be run from the project root so it can find the output folder for the data. python/data/find_all and python/data/rm_first
+contain data files from running the program. To start fresh delete the files in these two folders.
+Make sure to include the release flag or it will take forever. 1_000_000 is a reasonable number of games.
 ```bash
-cargo run --release <number_of_games>
+cargo run --release -- <subcommand> <number_of_games>
 ```
 
 And if you would like to generate the plotly graphs, create and activate a python virtual environment and get the required libraries.
@@ -57,56 +60,44 @@ python3 ./python/graph.py
 
 ## Results
 
-Here are the graphs from the data in ./python/data. This data represents >5 billion games of set played.
-The x-axis is how many times new cards have been added to the hand from the deck.
-This means the further right on the graph is further along in the game.
-The y-axis is the probability of a hand having no sets. Each graph represents a different size hand scenario.
-
-![](./resources/12.png)
+![](./resources/prob12.png)
 
 The 12 card hands act mostly as expected. The probability of a 12 card hand having no sets starts off low because the initial 12 cards are
 completely random. As the game is played and sets are removed and replaced with random cards, the probability of a setless 12 cards hand
-increases at a logarithmic rate. The 23rd (last) deal of cards into the hand is interesting, though. If there are only 12 cards remaining
-when the last cards are added from the deck into the hand the probability of a setless hand jumps up slightly.
+increases at a logarithmic rate. The 23rd (last) deal of cards into the hand is interesting, though. Initially I suspected this deviation was
+a bug but after writing another simulation that removes a random set and getting the same results I am less concerned.
+It is interesting that removing random sets elevates the probability of setless hands but doesn't change the distribution.
 
-![](./resources/15.png)
+![](./resources/avg12.png)
+Looking at the average number of sets for 12 card hands isn't suprising.
 
-This is where things get very confusing. When 15 card hands are encountered after one and two deals (when either the original 12 has no sets
-or it has a set but the new 12 after has no sets) the probability of the 15 cards containing no sets is the highest. Followed by a sharp
-decline to the second lowest probability at 5 deals.
-From deal 5 to deal 22 the probability increases linearly, but the 23 deal has the lowest probability.
+![](./resources/prob15.png)
+![](./resources/avg15.png)
 
-![](./resources/18.png)
+This is where things get more interesting.
+I don't have an intuitve explanation for why the probabilies act like this. I collected and graphed data about how many unique cards were
+in the set of sets. This turned out not being very informative. I think the next step is to look at the sets like vectors in 4 dimensional
+space. There are a few different classes of sets described by where the collinear vectors fall on the hypercube that represents all sets.
+Looking at the frequency and probabilities of these classes might be informative to what is happening here.
 
-At first glance the probability of an 18 card hand looks fairly consistent except for the anomaly of the last deal from the deck. It is
-interesting that the last deal has about 12 times the probability of containing no sets.
 
-![](./resources/18_zoom.png)
+![](./resources/prob18.png)
+![](./resources/avg15.png)
 
-After focusing in on those lower data points some wavy shape is identifiable. I ran this overnight, over 5 billion games, to see if
-the trend would become more obvious but the results are still quite noisy.
+Setless 18 card hands are so rare that the data is pretty noisy. As the hands get larger the end deviation gets more drastic.
+Looking at the average set count shows that there is consistent development that looks a lot like the 15 card hands.
+
+![](./resources/prob18_no_outlier.png)
+
+Removing the outlier shows this noise.
 
 ## Summary
 
-I am interested in why the last deal breaks the trends for every hand size in an alternating manner. I think the next step to investigate
-this phenomenon is to look at the total number of sets in the hand at every point in the game and see how it develops. Another concern I
-have is that these particular findings are a result of how I am searching for and removing sets from the game. My functions that find a
-set search in the same order every time and removes the first set it encounters. I could see this affecting the results by favoring
-sets that don't contain the new cards because it begins by looking at the begining of the hand. To make it more "human-like" I could find all
-the sets in a hand and randomly select one to remove from the deck. Arguably, this still isn't very human like. A basic strategy for a human
-could be taking a survey of which attribute states are most or least common and generating some intuition on which cards are most likely
-to be part of sets.
+The probabilities of setless 12 card hands is as expected. 15 and 18 card hands have more interesting behaviour. The next step
+I am going to take is categorizing sets based on their location in 4d space and seeing how these categories act over time.
 
 I have a very limited understanding of combinatorics and graph theory so maybe the explanation is quite obvious. Regardless, I think this
 is a cool representaion of how emergent properties can result from a simple set of rules.
-
-## TODO
-<ul>
-<li>Add some more comments and a README for the data format</li>
-<li>Analyze total number of sets at each point in the game</li>
-<li>Try removing random sets instead of the first set encountered</li>
-</ul>
-
 
 ## Credit
 Inspired by analysis by [Peter Norvig](https://norvig.com/SET.html) and [Don Knuth](https://cs.stanford.edu/~knuth/programs/setset-all.w)

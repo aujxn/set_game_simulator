@@ -14,6 +14,7 @@ find_all_df = pd.read_csv(find_all_path)
 rm_rand_df = pd.DataFrame(index=[i for i in range(24)])
 
 hand_sizes = ['12', '15', '18', '21']
+setless_hand_count_scatters = []
 probability_scatters = []
 avg_sets_scatters = []
 
@@ -68,6 +69,37 @@ for i in range(4):
     if i != 3:
         rm_rand_df['prob_no_sets' + hand_sizes[i]] = prob_no_sets[i]
                 
+for i in range(3):
+    setless_hand_count_scatters.append(go.Figure())
+
+    filtered_rand = rm_rand_df.loc[rm_rand_df['hands_without_sets' + hand_sizes[i]] != 0]
+
+    setless_hand_count_scatters[i].add_trace(
+            go.Scatter(
+                x=filtered_rand.index,
+                y=filtered_rand['hands_without_sets' + hand_sizes[i]],
+                mode='markers',
+                name='with random set removed'
+                )
+            )
+
+    setless_hand_count_scatters[i].update_layout(
+            title=go.layout.Title(
+                text='Counts of setless ' + hand_sizes[i] + ' card hand containing no sets',
+                xref='paper',
+                ),
+            xaxis=go.layout.XAxis(
+                title=go.layout.xaxis.Title(
+                    text='Times cards have been removed from the deck'
+                    )
+                ),
+            yaxis=go.layout.YAxis(
+                title=go.layout.yaxis.Title(
+                    text='Number of hands'
+                    )
+                ),
+            )
+
 for i in range(3):
     probability_scatters.append(go.Figure())
 
@@ -134,7 +166,7 @@ probability_scatters[3].add_trace(
 
 probability_scatters[3].update_layout(
         title=go.layout.Title(
-            text='Probability of a 18 card hand containing no sets (outlier remove)',
+            text='Probability of a 18 card hand containing no sets (outlier removed)',
             xref='paper',
             ),
         xaxis=go.layout.XAxis(
@@ -188,6 +220,14 @@ for i in range(4):
             dcc.Graph(
                 id='prob' + hand_sizes[i],
                 figure=probability_scatters[i],
+                )
+            )
+
+for i in range(3):
+    content.append(
+            dcc.Graph(
+                id='setless_hand_count' + hand_sizes[i],
+                figure=setless_hand_count_scatters[i],
                 )
             )
 
