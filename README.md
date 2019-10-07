@@ -35,7 +35,7 @@ cd set_game_simulator
 ```
 
 At this step you have enough to generate the raw data. To run the program you must have rustc or cargo installed.
-The program requires on of two subcommands --- rmfirst and findall. rmfirst removes the first set that is encountered
+The program requires one of two subcommands --- rmfirst and findall. rmfirst removes the first set that is encountered
 and findall locates all the sets in the hand and removes one at random. Both these subcommands require a number of games
 argument.
 The program must be run from the project root so it can find the output folder for the data. python/data/find_all and python/data/rm_first
@@ -69,6 +69,7 @@ a bug but after writing another simulation that removes a random set and getting
 It is interesting that removing random sets elevates the probability of setless hands but doesn't change the distribution.
 
 ![](./resources/avg12.png)
+
 Looking at the average number of sets for 12 card hands isn't suprising.
 
 ![](./resources/prob15.png)
@@ -82,7 +83,7 @@ Looking at the frequency and probabilities of these classes might be informative
 
 
 ![](./resources/prob18.png)
-![](./resources/avg15.png)
+![](./resources/avg18.png)
 
 Setless 18 card hands are so rare that the data is pretty noisy. As the hands get larger the end deviation gets more drastic.
 Looking at the average set count shows that there is consistent development that looks a lot like the 15 card hands.
