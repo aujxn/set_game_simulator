@@ -1,3 +1,8 @@
+/* This module implements a thread pool so work can be
+ * distributed to multiple cores. The threadpool instance
+ * takes a closure and the creating thread holds until
+ * all the work is complete when it goes out of scope
+ */
 use ::std::{
     sync::{mpsc, Arc, Mutex},
     thread,
@@ -36,7 +41,7 @@ impl Worker {
 
             match message {
                 Message::NewJob(job) => {
-                    job.call_box();
+                    *job.call_box();
                 }
                 Message::Kill => {
                     break;
@@ -77,10 +82,14 @@ impl Drop for ThreadPool {
 }
 
 impl ThreadPool {
+    /* constructor - size is number of threads desired */
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
+        /* uses multiple transmitter - single receiver to send work */
         let (tx, rx) = mpsc::channel();
+
+        /* channel is single reciever so needs arc/mutex to share between workers */
         let rx = Arc::new(Mutex::new(rx));
 
         let mut workers = Vec::with_capacity(size);
@@ -95,6 +104,7 @@ impl ThreadPool {
         }
     }
 
+    /* sends work to the workers */
     pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,

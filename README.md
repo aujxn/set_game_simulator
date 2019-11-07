@@ -94,8 +94,13 @@ Removing the outlier shows this noise.
 
 ## Summary
 
-The probabilities of setless 12 card hands is as expected. 15 and 18 card hands have more interesting behaviour. The next step
-I am going to take is categorizing sets based on their location in 4d space and seeing how these categories act over time.
+The probabilities of setless 12 card hands is as expected. 15 and 18 card hands have more interesting behaviour.
+
+Update 11/6/19:
+After classifying types of sets based on where the set falls in the geometric space of all sets
+I found that the probabilities of each class are consistent throughout the game. This means I
+have no ideas currently on where to look next. This project will probably be on hold for some time
+as school is staring to pick up again for the year.
 
 I have a very limited understanding of combinatorics and graph theory so maybe the explanation is quite obvious. Regardless, I think this
 is a cool representaion of how emergent properties can result from a simple set of rules.

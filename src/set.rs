@@ -10,6 +10,7 @@ pub enum State {
     Two,
 }
 
+
 /* A card has 4 characteristics that each have a state */
 #[derive(Debug)]
 pub struct Card(pub State, pub State, pub State, pub State);
@@ -22,6 +23,73 @@ impl State {
             1 => State::One,
             2 => State::Two,
             _ => panic!("Impossible card state!"),
+        }
+    }
+}
+
+ /* A set can be graphically represented as a group of 3 collinear
+ * vectors in in 4d space. The line these vectors make falls on
+ * an array of 81 hypercubes on a 4-torus. These lines intersect
+ * the hypercube based on how many of the attributes are the
+ * same/different:
+ *
+ * "cube" line: 3 same and 1 different
+ * "face" line: 2 same and 2 different
+ * "edge" line: 1 same and 3 different
+ * "vertex" line: all 4 different
+ */
+#[derive(Clone, Copy, Debug)]
+pub enum SetType {
+    Cube,
+    Face,
+    Edge,
+    Vertex,
+}
+
+/* Constructor for creating a State of a card characteristic */
+impl SetType {
+    pub fn new(diff: usize) -> Self {
+        match diff {
+            1 => SetType::Cube,
+            2 => SetType::Face,
+            3 => SetType::Edge,
+            4 => SetType::Vertex,
+            _ => panic!("Impossible set type!"),
+        }
+    }
+}
+
+/* A set is 3 indices in the hand */
+#[derive(Clone, Copy, Debug)]
+pub struct Set {
+    pub indices: [usize; 3],
+    pub class: SetType,
+}
+
+impl Set {
+    /* Only need two cards to determine the SetType */
+    pub fn new(set: [usize; 3], hand: &Vec<Card>) -> Self {
+        let mut diff_count = 0;
+
+        if hand[set[0]].0 as i32 != hand[set[1]].0 as i32 {
+            diff_count += 1;
+        }
+
+        if hand[set[0]].1 as i32 != hand[set[1]].1 as i32 {
+            diff_count += 1
+        }
+
+        if hand[set[0]].2 as i32 != hand[set[1]].2 as i32 {
+            diff_count += 1
+        }
+
+        if hand[set[0]].3 as i32 != hand[set[1]].3 as i32 {
+            diff_count += 1
+        }
+
+        Set {
+            indices: set,
+            class: SetType::new(diff_count),
         }
     }
 }

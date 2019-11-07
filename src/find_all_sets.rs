@@ -6,7 +6,7 @@
  * also removes a random set instead of the first set found.
  */
 
-use crate::{deck, set, set::Card, thread_pool::ThreadPool};
+use crate::{deck, set, set::Card, set::Set, thread_pool::ThreadPool};
 use csv;
 use itertools::Itertools;
 use rand::Rng;
@@ -14,12 +14,6 @@ use std::{
     collections::HashMap, error::Error, fs, fs::File, io::prelude::*, path::Path, sync::Arc,
     sync::Mutex,
 };
-
-/* A set is 3 indices in the hand */
-#[derive(Clone, Copy, Debug)]
-struct Set {
-    indices: [usize; 3],
-}
 
 impl Set {
     /* other is being removed from the hand.
@@ -80,7 +74,7 @@ impl Hand {
         let sets: Vec<Set> = (0..9)
             .tuple_combinations::<(_, _, _)>()
             .filter(|(x, y, z)| set::is_set(&cards[*x], &cards[*y], &cards[*z]))
-            .map(|(x, y, z)| Set { indices: [x, y, z] })
+            .map(|(x, y, z)| Set::new([x, y, z], &cards))
             .collect();
 
         Hand { cards, sets }
@@ -100,7 +94,7 @@ impl Hand {
                 &mut (0..split)
                     .tuple_combinations()
                     .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set { indices: [x, y, z] })
+                    .map(|(y, z)| Set::new([x, y, z], &self.cards))
                     .collect(),
             );
         }
@@ -111,7 +105,7 @@ impl Hand {
                 &mut (split..hand_size)
                     .tuple_combinations()
                     .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set { indices: [x, y, z] })
+                    .map(|(y, z)| Set::new([x, y, z], &self.cards))
                     .collect(),
             );
         }
@@ -122,31 +116,25 @@ impl Hand {
             &self.cards[split + 1],
             &self.cards[split + 2],
         ) {
-            self.sets.push(Set {
-                indices: [split, split + 1, split + 2],
-            });
+            self.sets.push(Set::new([split, split + 1, split + 2], &self.cards));
         }
 
-        let sets = self.sets.len();
+        let mut sets = [0; 4];
 
-        /* counts number of unique cards in list of sets */
-        let unique = self
-            .sets
-            .iter()
-            .flat_map(|x| x.indices.iter())
-            .unique()
-            .count();
+        self.sets.iter().for_each(|x| sets[x.class as usize] += 1);
 
         /* if sets were found then choose a random set and remove it */
-        if sets > 0 {
+        if self.sets.len() > 0 {
             self.rm_set();
         }
 
         Info {
-            sets,
+            cubes: sets[0],
+            faces: sets[1],
+            edges: sets[2],
+            vertices: sets[3],
             hand_size,
             deals,
-            unique,
         }
     }
 
@@ -180,21 +168,31 @@ impl Hand {
 /* records info about a hand */
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
 struct Info {
-    sets: usize,      //number of sets in the hand
-    hand_size: usize, //number of cards in the hand
-    deals: usize,     //how many times cards have been removed from deck
-    unique: usize,    //the number of unique cards in the sets
+    cubes: usize,       //number of "cube" sets
+    faces: usize,       //number of "face" sets
+    edges: usize,       //number of "edge" sets
+    vertices: usize,    //number of "vertex" sets
+    hand_size: usize,   //number of cards in the hand
+    deals: usize,       //how many times cards have been removed from deck
 }
 
 impl Info {
     fn serialize(&self) -> String {
-        self.sets.to_string()
+        self.cubes.to_string()
+            + ","
+            + &self.faces.to_string()
+            + ","
+            + &self.edges.to_string()
+            + ","
+            + &self.vertices.to_string()
             + ","
             + &self.hand_size.to_string()
             + ","
             + &self.deals.to_string()
-            + ","
-            + &self.unique.to_string()
+    }
+
+    fn no_sets(&self) -> bool {
+        self.cubes == 0 && self.faces == 0 && self.edges == 0 && self.vertices == 0
     }
 }
 
@@ -209,7 +207,7 @@ fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
         data.push(info);
 
         /* condition where hand needs a deal */
-        if info.sets == 0 || hand.cards.len() < 12 {
+        if info.no_sets()  || hand.cards.len() < 12 {
             for _i in 0..3 {
                 match deck.pop() {
                     Some(x) => hand.cards.push(x),
@@ -233,7 +231,7 @@ fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
     let map = data.lock().unwrap();
 
     /* Convert data to csv file */
-    let serialized = String::from("sets,hand_size,deals,unique,count\n")
+    let serialized = String::from("cubes,faces,edges,vertices,hand_size,deals,count\n")
         + &itertools::join(
             map.iter()
                 .map(|(info, count)| info.serialize() + "," + &count.to_string()),
@@ -258,26 +256,29 @@ fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
 }
 
 /* loads in the data from previous executions */
-fn load(data: &Arc<Mutex<HashMap<Info, i64>>>) {
+fn load(data: &Arc<Mutex<HashMap<Info, i64>>>) -> Result<(), Box<dyn Error + 'static>> {
     let path = Path::new("python/data/find_all/data.csv");
-    let contents = fs::read_to_string(path).unwrap();
+    let contents = fs::read_to_string(path)?;
 
     let mut rdr = csv::Reader::from_reader(contents.as_bytes());
 
     for result in rdr.records() {
         let record = result.unwrap();
         let info = Info {
-            sets: record[0].parse().unwrap(),
-            hand_size: record[1].parse().unwrap(),
-            deals: record[2].parse().unwrap(),
-            unique: record[3].parse().unwrap(),
+            cubes: record[0].parse()?,
+            faces: record[1].parse()?,
+            edges: record[2].parse()?,
+            vertices: record[3].parse()?,
+            hand_size: record[4].parse()?,
+            deals: record[5].parse()?,
         };
-        let count: i64 = record[4].parse().unwrap();
+        let count: i64 = record[6].parse()?;
 
         let mut map = data.lock().unwrap();
         let val = map.entry(info).or_insert(0);
         *val += count;
     }
+    Ok(())
 }
 
 /* runs the simulation */
@@ -293,7 +294,7 @@ pub fn run(games: i64) {
     let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
 
     /* loads a file with existing data into memory */
-    load(&data);
+    load(&data).unwrap_or_else(|_| log::info!("No file loaded"));
 
     for _ in 0..chunks {
         let pool = ThreadPool::new(workers);

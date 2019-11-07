@@ -14,9 +14,11 @@ find_all_df = pd.read_csv(find_all_path)
 rm_rand_df = pd.DataFrame(index=[i for i in range(24)])
 
 hand_sizes = ['12', '15', '18', '21']
+set_types = ['cube', 'face', 'edge', 'vertex']
 setless_hand_count_scatters = []
 probability_scatters = []
 avg_sets_scatters = []
+set_class_scatters = []
 
 for i in range(3):
     probs = []
@@ -33,16 +35,28 @@ for i in range(3):
 
 total_hands = [[0 for i in range(24)] for i in range(4)]
 total_set_count = [[0 for i in range(24)] for i in range(4)]
+total_cubes = [[0 for i in range(24)] for i in range(4)]
+total_faces = [[0 for i in range(24)] for i in range(4)]
+total_edges = [[0 for i in range(24)] for i in range(4)]
+total_vertices = [[0 for i in range(24)] for i in range(4)]
 hands_without_sets = [[0 for i in range(24)] for i in range(3)]
 
 for index, row in find_all_df.iterrows():
     hand_count = row['count']
-    set_count = hand_count * row['sets']
+    cubes = hand_count * row['cubes']
+    faces = hand_count * row['faces']
+    edges = hand_count * row['edges']
+    vertices = hand_count * row['vertices']
+    set_count = cubes + faces + edges + vertices
     hand_size = np.int_((row['hand_size'] - 12) / 3)
     deals = np.int_(row['deals'])
 
     total_set_count[hand_size][deals] += set_count
     total_hands[hand_size][deals] += hand_count
+    total_cubes[hand_size][deals] += cubes
+    total_faces[hand_size][deals] += faces
+    total_edges[hand_size][deals] += edges
+    total_vertices[hand_size][deals] += vertices
 
     if set_count == 0:
         hands_without_sets[hand_size][deals] += hand_count
@@ -50,22 +64,40 @@ for index, row in find_all_df.iterrows():
 for i in range(4):
     rm_rand_df['total_hands' + hand_sizes[i]] = total_hands[i]
     rm_rand_df['total_set_count' + hand_sizes[i]] = total_set_count[i]
+    rm_rand_df['cubes' + hand_sizes[i]] = total_cubes[i]
+    rm_rand_df['faces' + hand_sizes[i]] = total_faces[i]
+    rm_rand_df['edges' + hand_sizes[i]] = total_edges[i]
+    rm_rand_df['vertices' + hand_sizes[i]] = total_vertices[i]
     if i != 3:
         rm_rand_df['hands_without_sets' + hand_sizes[i]] = hands_without_sets[i]
 
 avg_set_count = [[0 for i in range(24)] for i in range(4)]
 prob_no_sets = [[0 for i in range(24)] for i in range(3)]
+cube_prop = [[0 for i in range(24)] for i in range(4)]
+face_prop = [[0 for i in range(24)] for i in range(4)]
+edge_prop = [[0 for i in range(24)] for i in range(4)]
+vertex_prop = [[0 for i in range(24)] for i in range(4)]
+
 
 for index, row in rm_rand_df.iterrows():
     for i in range(4):
         if row['total_hands' + hand_sizes[i]] != 0:
             avg_set_count[i][index] = row['total_set_count' + hand_sizes[i]] / row['total_hands' + hand_sizes[i]]
+            cube_prop[i][index] = row['cubes' + hand_sizes[i]] / row['total_set_count' + hand_sizes[i]]
+            face_prop[i][index] = row['faces' + hand_sizes[i]] / row['total_set_count' + hand_sizes[i]]
+            edge_prop[i][index] = row['edges' + hand_sizes[i]] / row['total_set_count' + hand_sizes[i]]
+            vertex_prop[i][index] = row['vertices' + hand_sizes[i]] / row['total_set_count' + hand_sizes[i]]
 
             if i != 3:
                 prob_no_sets[i][index] = row['hands_without_sets' + hand_sizes[i]] / row['total_hands' + hand_sizes[i]]
             
 for i in range(4):
     rm_rand_df['avg_set_count' + hand_sizes[i]] = avg_set_count[i]
+    rm_rand_df['cube_prop' + hand_sizes[i]] = cube_prop[i]
+    rm_rand_df['face_prop' + hand_sizes[i]] = face_prop[i]
+    rm_rand_df['edge_prop' + hand_sizes[i]] = edge_prop[i]
+    rm_rand_df['vertex_prop' + hand_sizes[i]] = vertex_prop[i]
+
     if i != 3:
         rm_rand_df['prob_no_sets' + hand_sizes[i]] = prob_no_sets[i]
                 
@@ -182,6 +214,37 @@ probability_scatters[3].update_layout(
         )
 
 for i in range(4):
+    set_class_scatters.append(go.Figure())
+    filtered_rand = rm_rand_df.loc[rm_rand_df['avg_set_count' + hand_sizes[i]] != 0]
+
+    for set_type in set_types:
+        set_class_scatters[i].add_trace(
+                go.Scatter(
+                    x=filtered_rand.index,
+                    y=filtered_rand[set_type + '_prop' + hand_sizes[i]],
+                    mode='markers',
+                    name= set_type,
+                    )
+                )
+
+    set_class_scatters[i].update_layout(
+            title=go.layout.Title(
+                text='Proportion of set types in a ' + hand_sizes[i] + ' card hand',
+                xref='paper',
+                ),
+            xaxis=go.layout.XAxis(
+                title=go.layout.xaxis.Title(
+                    text='Times cards have been removed from the deck'
+                    )
+                ),
+            yaxis=go.layout.YAxis(
+                title=go.layout.yaxis.Title(
+                    text='Set count'
+                    )
+                ),
+            )
+
+for i in range(4):
     avg_sets_scatters.append(go.Figure())
 
     filtered_rand = rm_rand_df.loc[rm_rand_df['avg_set_count' + hand_sizes[i]] != 0]
@@ -239,6 +302,13 @@ for i in range(4):
                 )
             )
 
+for i in range(4):
+    content.append(
+            dcc.Graph(
+                id='types' + hand_sizes[i],
+                figure=set_class_scatters[i],
+                )
+            )
 app.layout = html.Div(children=content)
 
 app.run_server(debug=True)
