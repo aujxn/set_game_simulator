@@ -6,13 +6,20 @@
  * also removes a random set instead of the first set found.
  */
 
-use crate::{HandType, Info, deck, set, set::Card, set::Set, write_out};
-use itertools::Itertools;
+use crate::{deck, set, set::Card, set::Set, write_out, HandType, Info};
 use indexmap::set::IndexSet;
+use itertools::Itertools;
 use rand::Rng;
 use std::{
-    collections::HashMap, fs::File, io::prelude::*, path::Path, sync::Arc,
-    sync::Mutex, time::Duration, sync::{mpsc, mpsc::{channel, Receiver}}, thread
+    collections::HashMap,
+    sync::Arc,
+    sync::Mutex,
+    sync::{
+        mpsc,
+        mpsc::{channel, Receiver},
+    },
+    thread,
+    time::Duration,
 };
 
 /* represents the current cards that are in play */
@@ -50,7 +57,7 @@ impl Hand {
         /* searches for sets that have two of the new cards */
         for (x, y) in new_cards.iter().tuple_combinations() {
             for z in self.cards.iter() {
-                if set::is_set(x, y, &z) {
+                if set::is_set(x, y, z) {
                     self.sets.push(Set::new([*x, *y, *z]));
                 }
             }
@@ -58,7 +65,8 @@ impl Hand {
 
         /* do the three new cards make a set? */
         if set::is_set(&new_cards[0], &new_cards[1], &new_cards[2]) {
-            self.sets.push(Set::new([new_cards[0], new_cards[1], new_cards[2]]));
+            self.sets
+                .push(Set::new([new_cards[0], new_cards[1], new_cards[2]]));
         }
 
         self.cards = self.cards.union(&new_cards).cloned().collect();
@@ -68,15 +76,16 @@ impl Hand {
     fn rm_set(&mut self) {
         let index = rand::thread_rng().gen_range(0, self.sets.len());
         let set_to_rm = self.sets.swap_remove(index);
-        
-        self.sets.retain(|set| set.cards.is_disjoint(&set_to_rm.cards));
+
+        self.sets
+            .retain(|set| set.cards.is_disjoint(&set_to_rm.cards));
         self.cards = self.cards.difference(&set_to_rm.cards).cloned().collect();
     }
 
     fn num_sets(&self) -> usize {
         self.sets.len()
     }
-    
+
     fn size(&self) -> usize {
         self.cards.len()
     }
@@ -98,7 +107,7 @@ fn play_game(data_store: &Arc<Mutex<HashMap<Info, u64>>>) {
             set_count,
             hand_size,
             deals,
-            hand_type
+            hand_type,
         };
         data.push(info);
 
@@ -117,7 +126,8 @@ fn play_game(data_store: &Arc<Mutex<HashMap<Info, u64>>>) {
             hand.rm_set();
 
             if hand.size() < 12 {
-                let new_cards: IndexSet<Card> = deck.split_off(66 - deals * 3).into_iter().collect();
+                let new_cards: IndexSet<Card> =
+                    deck.split_off(66 - deals * 3).into_iter().collect();
                 hand.find_new_sets(new_cards);
                 deals += 1;
                 hand_type = HandType::Ascending;
@@ -133,7 +143,7 @@ fn play_game(data_store: &Arc<Mutex<HashMap<Info, u64>>>) {
                 *count += 1;
             }
         }
-        Err(_) => panic!("poisoned mutex")
+        Err(_) => panic!("poisoned mutex"),
     }
 }
 
@@ -141,12 +151,10 @@ fn run_thread(data: Arc<Mutex<HashMap<Info, u64>>>, kill_switch: Receiver<bool>)
     loop {
         match kill_switch.try_recv() {
             Ok(_) => return,
-            Err(error) => {
-                match error {
-                    mpsc::TryRecvError::Empty => (),
-                    mpsc::TryRecvError::Disconnected => panic!("channel disconnect")
-                }
-            }
+            Err(error) => match error {
+                mpsc::TryRecvError::Empty => (),
+                mpsc::TryRecvError::Disconnected => panic!("channel disconnect"),
+            },
         }
         for _ in 0..1000 {
             play_game(&data);
@@ -155,7 +163,6 @@ fn run_thread(data: Arc<Mutex<HashMap<Info, u64>>>, kill_switch: Receiver<bool>)
 }
 
 pub fn run(run_time: Duration, num_threads: usize) {
-
     let data: Arc<Mutex<HashMap<Info, u64>>> = Arc::new(Mutex::new(HashMap::new()));
     let mut senders = vec![];
     let mut join_handles = vec![];
@@ -178,21 +185,18 @@ pub fn run(run_time: Duration, num_threads: usize) {
         handle.join().expect("couldn't join threads");
     }
 
-    /*
-    let data:Vec<(Info, u64)> = data.lock().expect("couldn't unlock data").iter().map(|(key, value)| (*key, *value)).collect();
-    let json = serde_json::to_string(&data).expect("couldn't serialize data");
+    let output = std::process::Command::new("hostname")
+        .output()
+        .expect("failed to get host")
+        .stdout;
+    let hostname = &std::str::from_utf8(&output).unwrap();
+    let pathname = format!(
+        "data/data-{}-{:?}.csv",
+        hostname,
+        chrono::prelude::Utc::now()
+    );
 
-    print!("{}", json);
-    */
-
-    let output = std::process::Command::new("hostname").output().expect("failed to get host").stdout;
-    let hostname = &std::str::from_utf8(&output).unwrap()[7..10];
-    let pathname = format!("data/data-{}-{:?}.csv", hostname, chrono::prelude::Utc::now());
-
-    let data = data
-        .lock()
-        .expect("couldn't unlock data")
-        .clone();
+    let data = data.lock().expect("couldn't unlock data").clone();
 
     write_out(&data, &pathname);
 }

@@ -3,13 +3,13 @@ pub mod find_all_sets;
 mod set;
 
 use std::{
-    fmt, collections::HashMap, fs, fs::File, io::prelude::*, path::Path, error::Error, str::FromStr
+    collections::HashMap, error::Error, fmt, fs, fs::File, io::prelude::*, path::Path, str::FromStr,
 };
 
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
 pub enum HandType {
     Ascending,
-    Descending
+    Descending,
 }
 
 impl fmt::Display for HandType {
@@ -27,7 +27,8 @@ pub struct ParseTypeError;
 impl std::error::Error for ParseTypeError {}
 impl fmt::Display for ParseTypeError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        Ok(fmt.write_str("not a valid hand type")?)
+        fmt.write_str("not a valid hand type")?;
+        Ok(())
     }
 }
 
@@ -35,7 +36,7 @@ impl FromStr for HandType {
     type Err = ParseTypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "ascending"{
+        if s == "ascending" {
             Ok(HandType::Ascending)
         } else if s == "descending" {
             Ok(HandType::Descending)
@@ -48,16 +49,14 @@ impl FromStr for HandType {
 /* records info about a hand */
 #[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
 pub struct Info {
-    set_count: usize,   //number of sets found in hand
-    hand_size: usize,   //number of cards in the hand
-    deals: usize,       //how many times cards have been removed from deck
+    set_count: usize, //number of sets found in hand
+    hand_size: usize, //number of cards in the hand
+    deals: usize,     //how many times cards have been removed from deck
     hand_type: HandType,
 }
 
-
 impl Info {
     fn serialize(&self) -> String {
-
         self.set_count.to_string()
             + ","
             + &self.hand_size.to_string()
@@ -114,5 +113,6 @@ pub fn consolidate() -> Result<(), Box<dyn Error + 'static>> {
         }
     }
 
-    Ok(write_out(&data, "data.csv"))
+    write_out(&data, "data.csv");
+    Ok(())
 }

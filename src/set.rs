@@ -11,7 +11,6 @@ pub enum State {
     Two,
 }
 
-
 /* A card has 4 characteristics that each have a state */
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
 pub struct Card(pub State, pub State, pub State, pub State);
@@ -37,7 +36,7 @@ pub struct Set {
 impl Set {
     pub fn new(set: [Card; 3]) -> Self {
         Set {
-            cards : set.iter().cloned().collect()
+            cards: set.iter().cloned().collect(),
         }
     }
 }
@@ -46,7 +45,7 @@ impl Set {
  * set every card has 4 attributes with 3 states. 3 cards make a
  * set if for each attribute the cards are of the same state or all
  * different states. When the states are represented by the numbers
- * 0, 1, and 2 modulo 3 can be used to determine if each attribute
+ * 0, 1, and 2, modulo 3 can be used to determine if each attribute
  * passes the set requirements.
  */
 pub fn is_set(first: &Card, second: &Card, third: &Card) -> bool {
