@@ -1,4 +1,6 @@
 /target
 **/*.rs.bk
 /venv
+python/venv
+/output
 Cargo.lock

@@ -4,13 +4,34 @@
  * 8/19/2019
  */
 
-/* CLI crate macros */
-#[macro_use]
-extern crate clap;
-use clap::App;
+use std::time::Duration;
+use set_simulator::{find_all_sets::run, consolidate};
+use structopt::StructOpt;
 
-extern crate set_simulator;
-pub use crate::set_simulator::{find_all_sets, rm_first_set};
+#[derive(Debug, StructOpt)]
+#[structopt(name = "set_simulator", about = "Monte Carlo Analysis of Set")]
+enum Opt {
+    /// Run the simulation
+    Run {
+        /// Time to run in hours
+        #[structopt(short, long, default_value = "0")]
+        hours: u64,
+
+        /// Time to run in minutes
+        #[structopt(short, long, default_value = "0")]
+        minutes: u64,
+
+        /// Time to run in seconds 
+        #[structopt(short, long, default_value = "0")]
+        seconds: u64,
+
+        /// Number of threads to use
+        #[structopt(short, long, default_value = "20")]
+        threads: usize,
+    },
+    /// Consolidate all data files into one
+    Consolidate
+}
 
 fn main() {
     /* Initialization */
@@ -18,16 +39,8 @@ fn main() {
     std::env::set_var("RUST_BACKTRACE", "full");
     env_logger::init();
 
-    /* CLI configuration and parsing */
-    let yml = load_yaml!("cli.yml");
-    let args = App::from_yaml(yml).get_matches();
-    match args.subcommand() {
-        ("rmfirst", Some(arg_matches)) => {
-            rm_first_set::run(arg_matches.value_of("games").unwrap().parse().unwrap())
-        }
-        ("findall", Some(arg_matches)) => {
-            find_all_sets::run(arg_matches.value_of("games").unwrap().parse().unwrap())
-        }
-        _ => unreachable!(), //clap app settings displays usage if no subcommand is provided
+    match Opt::from_args() {
+        Opt::Run{hours, minutes, seconds, threads} => run(Duration::from_secs(hours * 3600 + minutes * 60 + seconds), threads),
+        Opt::Consolidate => consolidate().expect("failed to consolidate"),
     }
 }

@@ -6,304 +6,193 @@
  * also removes a random set instead of the first set found.
  */
 
-use crate::{deck, set, set::Card, set::Set, thread_pool::ThreadPool};
-use csv;
+use crate::{HandType, Info, deck, set, set::Card, set::Set, write_out};
 use itertools::Itertools;
+use indexmap::set::IndexSet;
 use rand::Rng;
 use std::{
-    collections::HashMap, error::Error, fs, fs::File, io::prelude::*, path::Path, sync::Arc,
-    sync::Mutex,
+    collections::HashMap, fs::File, io::prelude::*, path::Path, sync::Arc,
+    sync::Mutex, time::Duration, sync::{mpsc, mpsc::{channel, Receiver}}, thread
 };
-
-impl Set {
-    /* other is being removed from the hand.
-     * known sets that have indices that come after the cards that
-     * are being removed must be decremented so they are still valid.
-     */
-    fn shift(&mut self, other: Self) {
-        /* determines how much and which indices need changing */
-        let shift: Vec<usize> = self
-            .indices
-            .iter()
-            .map(|x| {
-                other
-                    .indices
-                    .iter()
-                    .filter(|y| x > y)
-                    .fold(0, |acc, _| acc + 1)
-            })
-            .collect();
-
-        /* updates indices */
-        shift
-            .iter()
-            .enumerate()
-            .for_each(|(i, x)| self.indices[i] -= x);
-    }
-}
 
 /* represents the current cards that are in play */
 struct Hand {
-    cards: Vec<Card>,
-
-    /* All known sets in the hand.
-     * Tracking this prevents duplication of work
-     */
+    cards: IndexSet<Card>,
     sets: Vec<Set>,
 }
 
 impl Hand {
     /* creates a hand by getting 12 cards from the deck */
     fn new(deck: &mut Vec<Card>) -> Self {
-        let mut cards = vec![];
+        let cards: IndexSet<Card> = deck.drain(69..).collect();
 
-        for _i in 0..12 {
-            match deck.pop() {
-                Some(x) => cards.push(x),
-                None => unreachable!(), //there will always be 81 cards in the deck to start
-            }
-        }
-
-        /* finds all the sets in the first 9 cards of the hand.
-         * the reasoning behind this is making the game loop more simple.
-         * as the game is played, 3 cards are added to the hand.
-         * because the hand struct keeps track of all of the sets,
-         * the find_sets function only has to search for sets that contain
-         * the new cards. so to start the game loop, this sets up the hand
-         */
-        let sets: Vec<Set> = (0..9)
+        let sets: Vec<Set> = cards
+            .iter()
             .tuple_combinations::<(_, _, _)>()
-            .filter(|(x, y, z)| set::is_set(&cards[*x], &cards[*y], &cards[*z]))
-            .map(|(x, y, z)| Set::new([x, y, z], &cards))
+            .filter(|(x, y, z)| set::is_set(x, y, z))
+            .map(|(x, y, z)| Set::new([*x, *y, *z]))
             .collect();
 
         Hand { cards, sets }
     }
 
     /* finds all the sets in the hand that contain any of the new cards */
-    fn find_and_rm(&mut self, deck_len: usize) -> Info {
-        let hand_size = self.cards.len();
-        let split = hand_size - 3; //the divider between old and new cards
-
-        /* calculates how many times cards have been removed from the deck */
-        let deals = 23 - (deck_len / 3);
-
+    fn find_new_sets(&mut self, new_cards: IndexSet<Card>) {
         /* searches for sets that have one of the new cards */
-        for x in split..hand_size {
-            self.sets.append(
-                &mut (0..split)
-                    .tuple_combinations()
-                    .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set::new([x, y, z], &self.cards))
-                    .collect(),
-            );
+        for x in new_cards.iter() {
+            for (y, z) in self.cards.iter().tuple_combinations() {
+                if set::is_set(x, y, z) {
+                    self.sets.push(Set::new([*x, *y, *z]));
+                }
+            }
         }
 
         /* searches for sets that have two of the new cards */
-        for x in 0..split {
-            self.sets.append(
-                &mut (split..hand_size)
-                    .tuple_combinations()
-                    .filter(|(y, z)| set::is_set(&self.cards[x], &self.cards[*y], &self.cards[*z]))
-                    .map(|(y, z)| Set::new([x, y, z], &self.cards))
-                    .collect(),
-            );
+        for (x, y) in new_cards.iter().tuple_combinations() {
+            for z in self.cards.iter() {
+                if set::is_set(x, y, &z) {
+                    self.sets.push(Set::new([*x, *y, *z]));
+                }
+            }
         }
 
         /* do the three new cards make a set? */
-        if set::is_set(
-            &self.cards[split],
-            &self.cards[split + 1],
-            &self.cards[split + 2],
-        ) {
-            self.sets.push(Set::new([split, split + 1, split + 2], &self.cards));
+        if set::is_set(&new_cards[0], &new_cards[1], &new_cards[2]) {
+            self.sets.push(Set::new([new_cards[0], new_cards[1], new_cards[2]]));
         }
 
-        let mut sets = [0; 4];
-
-        self.sets.iter().for_each(|x| sets[x.class as usize] += 1);
-
-        /* if sets were found then choose a random set and remove it */
-        if self.sets.len() > 0 {
-            self.rm_set();
-        }
-
-        Info {
-            cubes: sets[0],
-            faces: sets[1],
-            edges: sets[2],
-            vertices: sets[3],
-            hand_size,
-            deals,
-        }
+        self.cards = self.cards.union(&new_cards).cloned().collect();
     }
 
     /* removes a set from the list of sets */
     fn rm_set(&mut self) {
-        /* pick a random set and destructor indices */
-        let to_rm = self.sets[rand::thread_rng().gen_range(0, self.sets.len())];
-        let (x, y, z) = (to_rm.indices[0], to_rm.indices[1], to_rm.indices[2]);
-
-        /* remove all sets that share cards with set to remove */
-        self.sets.retain(|set| {
-            !set.indices
-                .iter()
-                .any(|&x| to_rm.indices.iter().any(|&y| x == y))
-        });
-
-        /* shift indices to correct for removal */
-        for set in &mut self.sets {
-            set.shift(to_rm);
-        }
-
-        /* remove in reverse to keep indices consistent */
-        let mut a = [x, y, z];
-        a.sort();
-        a.iter().rev().for_each(|i| {
-            self.cards.remove(*i);
-        });
-    }
-}
-
-/* records info about a hand */
-#[derive(Hash, Eq, PartialEq, Debug, Copy, Clone)]
-struct Info {
-    cubes: usize,       //number of "cube" sets
-    faces: usize,       //number of "face" sets
-    edges: usize,       //number of "edge" sets
-    vertices: usize,    //number of "vertex" sets
-    hand_size: usize,   //number of cards in the hand
-    deals: usize,       //how many times cards have been removed from deck
-}
-
-impl Info {
-    fn serialize(&self) -> String {
-        self.cubes.to_string()
-            + ","
-            + &self.faces.to_string()
-            + ","
-            + &self.edges.to_string()
-            + ","
-            + &self.vertices.to_string()
-            + ","
-            + &self.hand_size.to_string()
-            + ","
-            + &self.deals.to_string()
+        let index = rand::thread_rng().gen_range(0, self.sets.len());
+        let set_to_rm = self.sets.swap_remove(index);
+        
+        self.sets.retain(|set| set.cards.is_disjoint(&set_to_rm.cards));
+        self.cards = self.cards.difference(&set_to_rm.cards).cloned().collect();
     }
 
-    fn no_sets(&self) -> bool {
-        self.cubes == 0 && self.faces == 0 && self.edges == 0 && self.vertices == 0
+    fn num_sets(&self) -> usize {
+        self.sets.len()
+    }
+    
+    fn size(&self) -> usize {
+        self.cards.len()
     }
 }
 
 /* plays an entire game of set and finds every set in every hand */
-fn play_game(data_store: Arc<Mutex<HashMap<Info, i64>>>) {
+fn play_game(data_store: &Arc<Mutex<HashMap<Info, u64>>>) {
     let mut deck = deck::shuffle_cards();
     let mut hand = Hand::new(&mut deck);
+    let mut deals = 0;
+    let mut hand_type = HandType::Ascending;
+
     let mut data: Vec<Info> = Vec::with_capacity(30);
 
     loop {
-        let info = hand.find_and_rm(deck.len());
+        let set_count = hand.num_sets();
+        let hand_size = hand.size();
+        let info = Info {
+            set_count,
+            hand_size,
+            deals,
+            hand_type
+        };
         data.push(info);
 
-        /* condition where hand needs a deal */
-        if info.no_sets()  || hand.cards.len() < 12 {
-            for _i in 0..3 {
-                match deck.pop() {
-                    Some(x) => hand.cards.push(x),
-                    None => {
-                        /* when no cards remain add all the data to the map */
-                        let mut map = data_store.lock().unwrap();
-                        for key in data {
-                            let count = map.entry(key).or_insert(0);
-                            *count += 1;
-                        }
-                        return;
-                    }
-                }
+        // a game of set always deals 3 cards 23 times
+        // 12 (start) + 23 (deals) * 3 (cards per deal) = 81 cards
+        if deals == 23 {
+            break;
+        }
+
+        if set_count == 0 {
+            let new_cards: IndexSet<Card> = deck.split_off(66 - deals * 3).into_iter().collect();
+            hand.find_new_sets(new_cards);
+            deals += 1;
+            hand_type = HandType::Ascending;
+        } else {
+            hand.rm_set();
+
+            if hand.size() < 12 {
+                let new_cards: IndexSet<Card> = deck.split_off(66 - deals * 3).into_iter().collect();
+                hand.find_new_sets(new_cards);
+                deals += 1;
+                hand_type = HandType::Ascending;
+            } else {
+                hand_type = HandType::Descending;
             }
         }
     }
-}
-
-/* exports data to the file */
-fn write_out(data: Arc<Mutex<HashMap<Info, i64>>>) {
-    let map = data.lock().unwrap();
-
-    /* Convert data to csv file */
-    let serialized = String::from("cubes,faces,edges,vertices,hand_size,deals,count\n")
-        + &itertools::join(
-            map.iter()
-                .map(|(info, count)| info.serialize() + "," + &count.to_string()),
-            "\n",
-        );
-
-    /* Create the path to write file to */
-    let path = Path::new("python/data/find_all/data.csv");
-    let display = path.display();
-
-    /* Make the file */
-    let mut file = match File::create(&path) {
-        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
-        Ok(file) => file,
-    };
-
-    /* Write the data to the file */
-    match file.write_all(serialized.as_bytes()) {
-        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
-        Ok(_) => log::info!("wrote data to {}", display),
+    match data_store.lock() {
+        Ok(mut map) => {
+            for key in data {
+                let count = map.entry(key).or_insert(0);
+                *count += 1;
+            }
+        }
+        Err(_) => panic!("poisoned mutex")
     }
 }
 
-/* loads in the data from previous executions */
-fn load(data: &Arc<Mutex<HashMap<Info, i64>>>) -> Result<(), Box<dyn Error + 'static>> {
-    let path = Path::new("python/data/find_all/data.csv");
-    let contents = fs::read_to_string(path)?;
-
-    let mut rdr = csv::Reader::from_reader(contents.as_bytes());
-
-    for result in rdr.records() {
-        let record = result.unwrap();
-        let info = Info {
-            cubes: record[0].parse()?,
-            faces: record[1].parse()?,
-            edges: record[2].parse()?,
-            vertices: record[3].parse()?,
-            hand_size: record[4].parse()?,
-            deals: record[5].parse()?,
-        };
-        let count: i64 = record[6].parse()?;
-
-        let mut map = data.lock().unwrap();
-        let val = map.entry(info).or_insert(0);
-        *val += count;
-    }
-    Ok(())
-}
-
-/* runs the simulation */
-pub fn run(games: i64) {
-    /* number of threads playing set games */
-    let workers = 4;
-
-    /* chunk the work so the work queue doesn't consume memory */
-    let chunk_size = 1000;
-    let chunks = games / chunk_size;
-
-    /* concurrent safe hash table to store the game result info in */
-    let data: Arc<Mutex<HashMap<Info, i64>>> = Arc::new(Mutex::new(HashMap::new()));
-
-    /* loads a file with existing data into memory */
-    load(&data).unwrap_or_else(|_| log::info!("No file loaded"));
-
-    for _ in 0..chunks {
-        let pool = ThreadPool::new(workers);
-
-        for _ in 0..chunk_size {
-            let safe_map = data.clone();
-            pool.execute(move || play_game(safe_map));
+fn run_thread(data: Arc<Mutex<HashMap<Info, u64>>>, kill_switch: Receiver<bool>) {
+    loop {
+        match kill_switch.try_recv() {
+            Ok(_) => return,
+            Err(error) => {
+                match error {
+                    mpsc::TryRecvError::Empty => (),
+                    mpsc::TryRecvError::Disconnected => panic!("channel disconnect")
+                }
+            }
+        }
+        for _ in 0..1000 {
+            play_game(&data);
         }
     }
+}
 
-    write_out(data);
+pub fn run(run_time: Duration, num_threads: usize) {
+
+    let data: Arc<Mutex<HashMap<Info, u64>>> = Arc::new(Mutex::new(HashMap::new()));
+    let mut senders = vec![];
+    let mut join_handles = vec![];
+
+    for _ in 0..num_threads {
+        let (send, recv) = channel();
+        senders.push(send);
+        let threadsafe_data = data.clone();
+        let handle = thread::spawn(move || run_thread(threadsafe_data, recv));
+        join_handles.push(handle);
+    }
+
+    thread::sleep(run_time);
+
+    for sender in senders {
+        sender.send(true).expect("failed to send killswitch");
+    }
+
+    for handle in join_handles {
+        handle.join().expect("couldn't join threads");
+    }
+
+    /*
+    let data:Vec<(Info, u64)> = data.lock().expect("couldn't unlock data").iter().map(|(key, value)| (*key, *value)).collect();
+    let json = serde_json::to_string(&data).expect("couldn't serialize data");
+
+    print!("{}", json);
+    */
+
+    let output = std::process::Command::new("hostname").output().expect("failed to get host").stdout;
+    let hostname = &std::str::from_utf8(&output).unwrap()[7..10];
+    let pathname = format!("data/data-{}-{:?}.csv", hostname, chrono::prelude::Utc::now());
+
+    let data = data
+        .lock()
+        .expect("couldn't unlock data")
+        .clone();
+
+    write_out(&data, &pathname);
 }
