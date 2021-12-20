@@ -12,7 +12,7 @@ game. In 2019 I originally implemented this as a way to learn the Rust language 
 (12/2021) refactored and simplified the code.
 
 The recent inspiration to revisit this problem came from two sources. First, I realized I
-should be looking at the probabilities of 'ascending' versus 'descending' sets (see definitions).
+should be looking at the probabilities of 'ascending' versus 'descending' hands (see definitions).
 Second, I recently gained access to the cluster computing environment through my university.
 The data I previously collected was extremely noisy when looking at 18 and 21 card hands
 because the probabilities related to these events are so small. I decided it would be fun to
@@ -104,16 +104,17 @@ In the repo I have included the data from running the simulation for a long time
 I used the python library ploty to generate the graphs, which are interactive. To create these
 graphs from the data:
 
-Create a python virtual environment and install the dependencies.
+Create a python virtual environment and install the dependencies:
 ```bash
 python3 -m venv venv
 source ./venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-The python script must be run from the project root to find the data file.
+Make the plots:
 ```bash
-python3 ./python/graph.py
+python3 graph.py
 ```
 Navigate to localhost:8050 in your browser to see the plots.
 
